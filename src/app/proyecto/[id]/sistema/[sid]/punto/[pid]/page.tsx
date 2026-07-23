@@ -7,8 +7,10 @@ import { useStore } from "@/lib/store";
 import { puntoCompleto } from "@/lib/progress";
 import { toEmbedUrl } from "@/lib/video";
 import { subirAsset, urlFirmada } from "@/lib/storage";
+import { descargarTexto, descargarArchivo, nombreDesdePath } from "@/lib/download";
 import { formatFechaHora } from "@/lib/ui";
 import { Breadcrumb } from "@/components/Breadcrumb";
+import { Toast } from "@/components/Toast";
 
 export default function PuntoView() {
   const { id, sid, pid } = useParams<{ id: string; sid: string; pid: string }>();
@@ -21,6 +23,10 @@ export default function PuntoView() {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [subiendoImg, setSubiendoImg] = useState(false);
   const [subiendoVideo, setSubiendoVideo] = useState(false);
+  const [copyLocal, setCopyLocal] = useState("");
+  const [urlLocal, setUrlLocal] = useState("");
+  const [toast, setToast] = useState<string | null>(null);
+  const notificar = (m: string) => setToast(m);
 
   const proyecto = getProyecto(id);
   const sistema = proyecto?.sistemas.find((s) => s.id === sid);
@@ -28,6 +34,15 @@ export default function PuntoView() {
 
   const imagen = punto?.imagen;
   const video = punto?.video;
+
+  // Sincroniza los campos editables al cambiar de punto.
+  useEffect(() => {
+    if (punto) {
+      setCopyLocal(punto.copy);
+      setUrlLocal(punto.url ?? "");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [punto?.id]);
 
   useEffect(() => {
     let activo = true;
@@ -64,6 +79,28 @@ export default function PuntoView() {
   const embed = video && !videoEsArchivo ? toEmbedUrl(video) : null;
   const esTexto = punto.tipo === "texto";
   const esLanding = punto.tipo === "landing";
+  const copySinGuardar = copyLocal !== punto.copy;
+  const urlSinGuardar = urlLocal !== (punto.url ?? "");
+
+  async function guardarCopy() {
+    await actualizarPunto(id, sid, pid, { copy: copyLocal });
+    notificar(esTexto ? "Contenido guardado correctamente" : "Copy guardado correctamente");
+  }
+
+  function descargarCopy() {
+    if (!punto) return;
+    descargarTexto(punto.nombre, copyLocal);
+  }
+
+  async function guardarUrl() {
+    const v = urlLocal.trim();
+    if (v && !/^https?:\/\//i.test(v)) {
+      alert("Ingresa un enlace válido que empiece por https://");
+      return;
+    }
+    await actualizarPunto(id, sid, pid, { url: v || undefined });
+    notificar("Enlace guardado correctamente");
+  }
 
   async function onImagen(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -75,7 +112,10 @@ export default function PuntoView() {
     }
     setSubiendoImg(true);
     const path = await subirAsset(file, `${id}/${sid}/${pid}/img`);
-    if (path) await actualizarPunto(id, sid, pid, { imagen: path });
+    if (path) {
+      await actualizarPunto(id, sid, pid, { imagen: path });
+      notificar("Imagen guardada correctamente");
+    }
     setSubiendoImg(false);
   }
 
@@ -89,11 +129,16 @@ export default function PuntoView() {
     }
     setSubiendoVideo(true);
     const path = await subirAsset(file, `${id}/${sid}/${pid}/video`);
-    if (path) await actualizarPunto(id, sid, pid, { video: path });
+    if (path) {
+      await actualizarPunto(id, sid, pid, { video: path });
+      notificar("Video guardado correctamente");
+    }
     setSubiendoVideo(false);
   }
 
   const nombreEditable = !punto.fijo;
+  const btnSec =
+    "rounded-lg border border-border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-slate-50 disabled:opacity-40";
 
   return (
     <div>
@@ -178,8 +223,8 @@ export default function PuntoView() {
             </span>
           </div>
           <textarea
-            value={punto.copy}
-            onChange={(e) => actualizarPunto(id, sid, pid, { copy: e.target.value })}
+            value={copyLocal}
+            onChange={(e) => setCopyLocal(e.target.value)}
             placeholder={
               esTexto
                 ? "Escribe aquí el contenido…"
@@ -188,9 +233,27 @@ export default function PuntoView() {
             rows={esTexto ? 20 : 14}
             className="w-full resize-y rounded-lg border border-border bg-white p-3 text-sm leading-relaxed outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
           />
-          <p className="mt-2 text-xs text-muted">
-            Se guarda automáticamente y recalcula el avance.
-          </p>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs text-muted">
+              {copySinGuardar ? "Cambios sin guardar" : "Todo guardado"}
+            </span>
+            <div className="flex gap-2">
+              <button
+                onClick={descargarCopy}
+                disabled={!copyLocal.trim()}
+                className={btnSec}
+              >
+                ⬇ Descargar
+              </button>
+              <button
+                onClick={guardarCopy}
+                disabled={!copySinGuardar}
+                className="rounded-lg bg-accent px-4 py-1.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+              >
+                Guardar
+              </button>
+            </div>
+          </div>
         </section>
 
         {/* Landing: URL */}
@@ -201,21 +264,30 @@ export default function PuntoView() {
               <span className="text-xs text-muted">Opcional · enlace</span>
             </div>
             <input
-              value={punto.url ?? ""}
-              onChange={(e) => actualizarPunto(id, sid, pid, { url: e.target.value })}
+              value={urlLocal}
+              onChange={(e) => setUrlLocal(e.target.value)}
               placeholder="https://…"
               className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
             />
-            {punto.url && (
-              <a
-                href={punto.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-accent/10 px-3 py-2 text-sm font-medium text-accent hover:bg-accent/20"
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <button
+                onClick={guardarUrl}
+                disabled={!urlSinGuardar}
+                className="rounded-lg bg-accent px-4 py-1.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"
               >
-                🔗 Abrir landing en nueva pestaña
-              </a>
-            )}
+                Guardar
+              </button>
+              {punto.url && (
+                <a
+                  href={punto.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-accent/10 px-3 py-2 text-sm font-medium text-accent hover:bg-accent/20"
+                >
+                  🔗 Abrir landing en nueva pestaña
+                </a>
+              )}
+            </div>
           </section>
         )}
 
@@ -242,11 +314,20 @@ export default function PuntoView() {
                       Cargando imagen…
                     </div>
                   )}
-                  <div className="mt-3 flex gap-2">
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      onClick={() =>
+                        imgUrl && descargarArchivo(imgUrl, nombreDesdePath(imagen))
+                      }
+                      disabled={!imgUrl}
+                      className={btnSec}
+                    >
+                      ⬇ Descargar
+                    </button>
                     <button
                       onClick={() => imgRef.current?.click()}
                       disabled={subiendoImg}
-                      className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-slate-50 disabled:opacity-50"
+                      className={btnSec}
                     >
                       {subiendoImg ? "Subiendo…" : "Reemplazar"}
                     </button>
@@ -318,12 +399,26 @@ export default function PuntoView() {
                       {video}
                     </a>
                   )}
-                  <button
-                    onClick={() => actualizarPunto(id, sid, pid, { video: undefined })}
-                    className="mt-3 rounded-lg px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
-                  >
-                    Quitar video
-                  </button>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {videoEsArchivo && (
+                      <button
+                        onClick={() =>
+                          videoUrl &&
+                          descargarArchivo(videoUrl, nombreDesdePath(video))
+                        }
+                        disabled={!videoUrl}
+                        className={btnSec}
+                      >
+                        ⬇ Descargar
+                      </button>
+                    )}
+                    <button
+                      onClick={() => actualizarPunto(id, sid, pid, { video: undefined })}
+                      className="rounded-lg px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
+                    >
+                      Quitar video
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -333,6 +428,7 @@ export default function PuntoView() {
                       if (!videoLink.trim()) return;
                       actualizarPunto(id, sid, pid, { video: videoLink.trim() });
                       setVideoLink("");
+                      notificar("Video guardado correctamente");
                     }}
                     className="flex gap-2"
                   >
@@ -373,6 +469,8 @@ export default function PuntoView() {
           </div>
         )}
       </div>
+
+      {toast && <Toast mensaje={toast} onClose={() => setToast(null)} />}
     </div>
   );
 }
