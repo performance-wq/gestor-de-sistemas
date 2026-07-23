@@ -58,6 +58,11 @@ interface StoreValue {
     patch: Partial<Omit<Punto, "id">>,
   ) => Promise<void>;
   eliminarPunto: (pid: string, sid: string, ptid: string) => Promise<void>;
+  reordenarPuntos: (
+    pid: string,
+    sid: string,
+    idsOrdenados: string[],
+  ) => Promise<void>;
 }
 
 const StoreContext = createContext<StoreValue | null>(null);
@@ -414,6 +419,39 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [supabase],
   );
 
+  // Reordena los puntos de un sistema y persiste el nuevo orden.
+  const reordenarPuntos = useCallback(
+    async (pid: string, sid: string, idsOrdenados: string[]) => {
+      setProyectos((prev) =>
+        prev.map((p) =>
+          p.id === pid
+            ? {
+                ...p,
+                sistemas: p.sistemas.map((s) =>
+                  s.id === sid
+                    ? {
+                        ...s,
+                        puntos: idsOrdenados
+                          .map((ptid) => s.puntos.find((pt) => pt.id === ptid))
+                          .filter((pt): pt is Punto => !!pt),
+                      }
+                    : s,
+                ),
+              }
+            : p,
+        ),
+      );
+      const res = await Promise.all(
+        idsOrdenados.map((ptid, i) =>
+          supabase.from("puntos").update({ orden: i + 1 }).eq("id", ptid),
+        ),
+      );
+      const err = res.find((r) => r.error);
+      if (err?.error) console.error("Error reordenando:", err.error.message);
+    },
+    [supabase],
+  );
+
   const value = useMemo<StoreValue>(
     () => ({
       proyectos,
@@ -430,6 +468,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       agregarPunto,
       actualizarPunto,
       eliminarPunto,
+      reordenarPuntos,
     }),
     [
       proyectos,
@@ -446,6 +485,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       agregarPunto,
       actualizarPunto,
       eliminarPunto,
+      reordenarPuntos,
     ],
   );
 
