@@ -152,9 +152,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (user) {
           const { data: perfil } = await supabase
             .from("profiles")
-            .select("nombre, rol")
+            .select("nombre, rol, activo")
             .eq("id", user.id)
             .maybeSingle();
+          // Usuario desactivado: cerrar sesión y bloquear acceso.
+          if (perfil && perfil.activo === false) {
+            await supabase.auth.signOut();
+            if (typeof window !== "undefined")
+              window.location.href = "/systemspex/login?inactivo=1";
+            return;
+          }
           setUsuario({
             id: user.id,
             email: user.email ?? "",
