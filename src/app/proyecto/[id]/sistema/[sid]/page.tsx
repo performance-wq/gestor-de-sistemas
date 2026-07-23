@@ -20,7 +20,7 @@ export default function SistemaView() {
     return (
       <div className="py-20 text-center">
         <p className="text-muted">Este sistema no existe.</p>
-        <Link href="/" className="mt-3 inline-block text-sm text-accent">
+        <Link href="/dashboard" className="mt-3 inline-block text-sm text-accent">
           ← Volver a proyectos
         </Link>
       </div>
@@ -35,7 +35,7 @@ export default function SistemaView() {
     <div>
       <Breadcrumb
         items={[
-          { label: "Proyectos", href: "/" },
+          { label: "Proyectos", href: "/dashboard" },
           { label: proyecto.nombre, href: `/proyecto/${proyecto.id}` },
           { label: sistema.nombre },
         ]}

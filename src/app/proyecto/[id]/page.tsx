@@ -9,6 +9,7 @@ import { ESTADOS, estadoStyles, formatFecha } from "@/lib/ui";
 import type { Estado } from "@/lib/types";
 import { ProgressBar } from "@/components/ProgressBar";
 import { Breadcrumb } from "@/components/Breadcrumb";
+import { DatosControl } from "@/components/DatosControl";
 
 export default function ProyectoView() {
   const { id } = useParams<{ id: string }>();
@@ -28,7 +29,7 @@ export default function ProyectoView() {
     return (
       <div className="py-20 text-center">
         <p className="text-muted">Este proyecto no existe.</p>
-        <Link href="/" className="mt-3 inline-block text-sm text-accent">
+        <Link href="/dashboard" className="mt-3 inline-block text-sm text-accent">
           ← Volver a proyectos
         </Link>
       </div>
@@ -40,7 +41,7 @@ export default function ProyectoView() {
 
   return (
     <div>
-      <Breadcrumb items={[{ label: "Proyectos", href: "/" }, { label: proyecto.nombre }]} />
+      <Breadcrumb items={[{ label: "Proyectos", href: "/dashboard" }, { label: proyecto.nombre }]} />
 
       {/* Cabecera del proyecto */}
       <div className="mt-4 rounded-2xl border border-border bg-surface p-6 shadow-sm">
@@ -50,6 +51,12 @@ export default function ProyectoView() {
               {proyecto.nombre}
             </h1>
             <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted">
+              {proyecto.cliente && <span>Cliente: {proyecto.cliente}</span>}
+              {proyecto.nicho && (
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
+                  {proyecto.nicho}
+                </span>
+              )}
               <span>Incorporación: {formatFecha(proyecto.fechaIncorporacion)}</span>
               <span>Cierre: {formatFecha(proyecto.fechaCierre)}</span>
             </div>
@@ -74,7 +81,7 @@ export default function ProyectoView() {
                   confirm(`¿Eliminar el proyecto "${proyecto.nombre}"? Esta acción no se puede deshacer.`)
                 ) {
                   eliminarProyecto(proyecto.id);
-                  router.push("/");
+                  router.push("/dashboard");
                 }
               }}
               className="rounded-lg px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
@@ -153,6 +160,11 @@ export default function ProyectoView() {
             </button>
           </div>
         </form>
+      </div>
+
+      {/* Datos de control */}
+      <div className="mt-8">
+        <DatosControl proyecto={proyecto} />
       </div>
     </div>
   );
