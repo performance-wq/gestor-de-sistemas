@@ -31,7 +31,8 @@ interface CrearProyectoInput {
   nombre: string;
   estado: Estado;
   fechaIncorporacion: string;
-  fechaCierre?: string;
+  cliente?: string;
+  nicho?: string;
 }
 
 interface StoreValue {
@@ -71,7 +72,11 @@ function mapPunto(p: Row): Punto {
     copy: (p.copy as string) ?? "",
     imagen: (p.imagen as string) ?? undefined,
     video: (p.video as string) ?? undefined,
+    url: (p.url as string) ?? undefined,
+    tipo: ((p.tipo as string) ?? "estandar") as Punto["tipo"],
+    programacion: (p.programacion as string) ?? undefined,
     fijo: (p.fijo as boolean) ?? false,
+    actualizadoEn: (p.actualizado_en as string) ?? null,
   };
 }
 
@@ -92,9 +97,19 @@ function mapProyecto(p: Row): Proyecto {
     id: p.id as string,
     nombre: p.nombre as string,
     estado: p.estado as Estado,
+    cliente: (p.cliente as string) ?? undefined,
+    nicho: (p.nicho as string) ?? undefined,
+    palabrasClave: (p.palabras_clave as string) ?? undefined,
     fechaIncorporacion: (p.fecha_incorporacion as string) ?? "",
     fechaCierre: (p.fecha_cierre as string) ?? undefined,
+    resultadoAntes: (p.resultado_antes as number) ?? null,
+    resultadoAntesFecha: (p.resultado_antes_fecha as string) ?? null,
+    resultadoCon: (p.resultado_con as number) ?? null,
+    resultadoConFecha: (p.resultado_con_fecha as string) ?? null,
+    evidenciaImagen: (p.evidencia_imagen as string) ?? undefined,
+    evidenciaVideo: (p.evidencia_video as string) ?? undefined,
     creado: (p.created_at as string) ?? "",
+    actualizadoEn: (p.actualizado_en as string) ?? null,
     sistemas,
   };
 }
@@ -167,6 +182,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         p_nombre: input.nombre.trim(),
         p_estado: input.estado,
         p_fecha_incorporacion: input.fechaIncorporacion || null,
+        p_cliente: input.cliente?.trim() || null,
+        p_nicho: input.nicho || null,
       });
       if (error) {
         console.error("Error creando proyecto:", error.message);
@@ -197,10 +214,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const row: Row = {};
       if (patch.nombre !== undefined) row.nombre = patch.nombre;
       if (patch.estado !== undefined) row.estado = patch.estado;
+      if (patch.cliente !== undefined) row.cliente = patch.cliente || null;
+      if (patch.nicho !== undefined) row.nicho = patch.nicho || null;
+      if (patch.palabrasClave !== undefined)
+        row.palabras_clave = patch.palabrasClave || null;
       if (patch.fechaIncorporacion !== undefined)
         row.fecha_incorporacion = patch.fechaIncorporacion || null;
       if (patch.fechaCierre !== undefined)
         row.fecha_cierre = patch.fechaCierre || null;
+      if (patch.resultadoAntes !== undefined)
+        row.resultado_antes = patch.resultadoAntes;
+      if (patch.resultadoAntesFecha !== undefined)
+        row.resultado_antes_fecha = patch.resultadoAntesFecha || null;
+      if (patch.resultadoCon !== undefined)
+        row.resultado_con = patch.resultadoCon;
+      if (patch.resultadoConFecha !== undefined)
+        row.resultado_con_fecha = patch.resultadoConFecha || null;
+      if (patch.evidenciaImagen !== undefined)
+        row.evidencia_imagen = patch.evidenciaImagen || null;
+      if (patch.evidenciaVideo !== undefined)
+        row.evidencia_video = patch.evidenciaVideo || null;
       const { error } = await supabase.from("proyectos").update(row).eq("id", id);
       if (error) console.error("Error actualizando proyecto:", error.message);
     },
@@ -343,6 +376,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (patch.copy !== undefined) row.copy = patch.copy;
       if (patch.imagen !== undefined) row.imagen = patch.imagen ?? null;
       if (patch.video !== undefined) row.video = patch.video ?? null;
+      if (patch.url !== undefined) row.url = patch.url ?? null;
       const { error } = await supabase.from("puntos").update(row).eq("id", ptid);
       if (error) console.error("Error actualizando punto:", error.message);
     },

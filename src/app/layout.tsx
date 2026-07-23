@@ -10,9 +10,9 @@ const geistSans = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "Gestor de Sistemas · Pex",
+  title: "Systems PEX",
   description:
-    "Herramienta interna para organizar implementaciones de CRM en GoHighLevel.",
+    "Herramienta interna Pex para gestionar implementaciones de CRM.",
 };
 
 export default function RootLayout({

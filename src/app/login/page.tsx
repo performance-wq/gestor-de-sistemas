@@ -38,7 +38,7 @@ export default function LoginPage() {
           setCargando(false);
           return;
         }
-        router.push("/");
+        router.push("/dashboard");
         router.refresh();
       } else {
         const { data, error } = await supabase.auth.signUp({
@@ -46,7 +46,7 @@ export default function LoginPage() {
           password,
           options: {
             data: { nombre },
-            emailRedirectTo: `${window.location.origin}/auth/callback`,
+            emailRedirectTo: `${window.location.origin}/systemspex/auth/callback`,
           },
         });
         if (error) {
@@ -55,7 +55,7 @@ export default function LoginPage() {
           return;
         }
         if (data.session) {
-          router.push("/");
+          router.push("/dashboard");
           router.refresh();
         } else {
           setAviso(
@@ -79,11 +79,9 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="mb-6 text-center">
           <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-accent text-lg font-bold text-white">
-            G
+            S
           </div>
-          <h1 className="text-xl font-semibold tracking-tight">
-            Gestor de Sistemas
-          </h1>
+          <h1 className="text-xl font-semibold tracking-tight">Systems PEX</h1>
           <p className="mt-1 text-sm text-muted">
             {modo === "login"
               ? "Inicia sesión para continuar"

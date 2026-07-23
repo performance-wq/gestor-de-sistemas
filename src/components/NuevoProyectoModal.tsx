@@ -3,13 +3,15 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useStore } from "@/lib/store";
-import { ESTADOS } from "@/lib/ui";
+import { ESTADOS, NICHOS } from "@/lib/ui";
 import type { Estado } from "@/lib/types";
 
 export function NuevoProyectoModal({ onClose }: { onClose: () => void }) {
   const { crearProyecto } = useStore();
   const router = useRouter();
   const [nombre, setNombre] = useState("");
+  const [cliente, setCliente] = useState("");
+  const [nicho, setNicho] = useState<string>("");
   const [estado, setEstado] = useState<Estado>("Pendiente");
   const [fechaIncorporacion, setFecha] = useState(
     new Date().toISOString().slice(0, 10),
@@ -22,15 +24,26 @@ export function NuevoProyectoModal({ onClose }: { onClose: () => void }) {
     if (!nombre.trim() || guardando) return;
     setGuardando(true);
     setError("");
-    const p = await crearProyecto({ nombre, estado, fechaIncorporacion });
+    const p = await crearProyecto({
+      nombre,
+      estado,
+      fechaIncorporacion,
+      cliente,
+      nicho,
+    });
     if (!p) {
       setGuardando(false);
-      setError("No se pudo crear el proyecto. Revisa tu sesión e inténtalo de nuevo.");
+      setError(
+        "No se pudo crear el proyecto. Revisa tu sesión e inténtalo de nuevo.",
+      );
       return;
     }
     onClose();
     router.push(`/proyecto/${p.id}`);
   }
+
+  const inputCls =
+    "w-full rounded-lg border border-border bg-white px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20";
 
   return (
     <div
@@ -43,20 +56,44 @@ export function NuevoProyectoModal({ onClose }: { onClose: () => void }) {
       >
         <h2 className="text-lg font-semibold">Nuevo proyecto</h2>
         <p className="mt-1 text-sm text-muted">
-          Se cargarán automáticamente los 6 sistemas de la plantilla.
+          Se cargarán automáticamente los sistemas de la plantilla.
         </p>
         <form onSubmit={submit} className="mt-5 space-y-4">
           <div>
             <label className="mb-1.5 block text-sm font-medium">
-              Nombre del cliente
+              Nombre del proyecto
             </label>
             <input
               autoFocus
               value={nombre}
               onChange={(e) => setNombre(e.target.value)}
               placeholder="Ej. Clínica Sonrisa"
-              className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+              className={inputCls}
             />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">Cliente</label>
+              <input
+                value={cliente}
+                onChange={(e) => setCliente(e.target.value)}
+                placeholder="Nombre del cliente"
+                className={inputCls}
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">Nicho</label>
+              <select
+                value={nicho}
+                onChange={(e) => setNicho(e.target.value)}
+                className={inputCls}
+              >
+                <option value="">—</option>
+                {NICHOS.map((n) => (
+                  <option key={n}>{n}</option>
+                ))}
+              </select>
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -64,7 +101,7 @@ export function NuevoProyectoModal({ onClose }: { onClose: () => void }) {
               <select
                 value={estado}
                 onChange={(e) => setEstado(e.target.value as Estado)}
-                className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+                className={inputCls}
               >
                 {ESTADOS.map((e) => (
                   <option key={e}>{e}</option>
@@ -79,7 +116,7 @@ export function NuevoProyectoModal({ onClose }: { onClose: () => void }) {
                 type="date"
                 value={fechaIncorporacion}
                 onChange={(e) => setFecha(e.target.value)}
-                className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+                className={inputCls}
               />
             </div>
           </div>
