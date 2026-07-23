@@ -40,7 +40,7 @@ export default function AdminPage() {
 
   const cargar = useCallback(async () => {
     try {
-      const r = await fetch("/api/admin/usuarios", { cache: "no-store" });
+      const r = await fetch("/systemspex/api/admin/usuarios", { cache: "no-store" });
       if (r.ok) {
         const j = await r.json();
         setUsuarios(j.usuarios as Perfil[]);
@@ -88,7 +88,7 @@ export default function AdminPage() {
     setCreando(true);
     setMsg(null);
     try {
-      const r = await fetch("/api/admin/usuarios", {
+      const r = await fetch("/systemspex/api/admin/usuarios", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, nombre, password, rol }),
@@ -131,7 +131,7 @@ export default function AdminPage() {
     setUsuarios((prev) =>
       prev.map((u) => (u.id === id ? { ...u, nombre: nuevo.trim() } : u)),
     );
-    await fetch("/api/admin/usuarios", {
+    await fetch("/systemspex/api/admin/usuarios", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, nombre: nuevo.trim() }),
@@ -143,7 +143,7 @@ export default function AdminPage() {
       "Nueva contraseña temporal (mínimo 8 caracteres):",
     );
     if (!pw) return;
-    const r = await fetch("/api/admin/usuarios", {
+    const r = await fetch("/systemspex/api/admin/usuarios", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, password: pw }),
@@ -163,7 +163,7 @@ export default function AdminPage() {
       )
     )
       return;
-    const r = await fetch("/api/admin/usuarios?id=" + id, { method: "DELETE" });
+    const r = await fetch("/systemspex/api/admin/usuarios?id=" + id, { method: "DELETE" });
     const j = await r.json();
     if (r.ok) {
       setUsuarios((prev) => prev.filter((u) => u.id !== id));
