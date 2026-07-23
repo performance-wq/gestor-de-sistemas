@@ -125,6 +125,19 @@ export default function AdminPage() {
     await supabase.from("profiles").update({ rol: r }).eq("id", id);
   }
 
+  async function editarNombre(id: string, actual: string) {
+    const nuevo = window.prompt("Nuevo nombre:", actual);
+    if (nuevo === null || nuevo.trim() === "") return;
+    setUsuarios((prev) =>
+      prev.map((u) => (u.id === id ? { ...u, nombre: nuevo.trim() } : u)),
+    );
+    await fetch("/api/admin/usuarios", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, nombre: nuevo.trim() }),
+    });
+  }
+
   async function resetPassword(id: string) {
     const pw = window.prompt(
       "Nueva contraseña temporal (mínimo 8 caracteres):",
@@ -326,6 +339,12 @@ export default function AdminPage() {
                       }`}
                     >
                       {u.activo ? "Desactivar" : "Activar"}
+                    </button>
+                    <button
+                      onClick={() => editarNombre(u.id, u.nombre || "")}
+                      className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-muted transition-colors hover:bg-slate-50 hover:text-foreground"
+                    >
+                      Editar
                     </button>
                     <button
                       onClick={() => resetPassword(u.id)}
