@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-// Verifica que quien llama sea un admin activo.
+// Verifica que quien llama sea un admin activo. Devuelve el cliente admin y el id.
 async function requireAdmin() {
   const supabase = await createClient();
   const {
@@ -17,21 +17,45 @@ async function requireAdmin() {
     .single();
   if (!perfil || perfil.rol !== "admin" || perfil.activo === false)
     return { ok: false as const, status: 403 };
-  return { ok: true as const, admin };
+  return { ok: true as const, admin, callerId: user.id };
 }
 
-// POST — crear un usuario nuevo (solo admin).
+// GET — lista completa de usuarios con último acceso y quién los creó.
+export async function GET() {
+  const auth = await requireAdmin();
+  if (!auth.ok)
+    return NextResponse.json({ error: "No autorizado" }, { status: auth.status });
+  const { admin } = auth;
+
+  const { data: perfiles } = await admin
+    .from("profiles")
+    .select("id,email,nombre,rol,activo,created_at,creado_por")
+    .order("created_at", { ascending: true });
+
+  const { data: lista } = await admin.auth.admin.listUsers({ perPage: 200 });
+  const ultimo: Record<string, string | null> = {};
+  for (const u of lista?.users ?? []) ultimo[u.id] = u.last_sign_in_at ?? null;
+
+  const nombrePorId: Record<string, string> = {};
+  for (const p of perfiles ?? []) nombrePorId[p.id] = p.nombre || p.email;
+
+  const usuarios = (perfiles ?? []).map((p) => ({
+    ...p,
+    ultimo_acceso: ultimo[p.id] ?? null,
+    creado_por_nombre: p.creado_por ? nombrePorId[p.creado_por] ?? null : null,
+  }));
+
+  return NextResponse.json({ usuarios });
+}
+
+// POST — crear usuario.
 export async function POST(request: NextRequest) {
   const auth = await requireAdmin();
   if (!auth.ok)
     return NextResponse.json({ error: "No autorizado" }, { status: auth.status });
+  const { admin, callerId } = auth;
 
-  let body: {
-    email?: string;
-    nombre?: string;
-    password?: string;
-    rol?: string;
-  };
+  let body: { email?: string; nombre?: string; password?: string; rol?: string };
   try {
     body = await request.json();
   } catch {
@@ -49,8 +73,6 @@ export async function POST(request: NextRequest) {
       { status: 400 },
     );
 
-  const { admin } = auth;
-
   const { data: creado, error } = await admin.auth.admin.createUser({
     email,
     password,
@@ -63,11 +85,70 @@ export async function POST(request: NextRequest) {
       { status: 400 },
     );
 
-  // El trigger crea el profile; ajustamos nombre y rol.
   await admin
     .from("profiles")
-    .update({ nombre: nombre || email, rol, activo: true })
+    .update({ nombre: nombre || email, rol, activo: true, creado_por: callerId })
     .eq("id", creado.user.id);
 
   return NextResponse.json({ id: creado.user.id });
+}
+
+// PATCH — editar usuario (nombre) o restablecer contraseña.
+export async function PATCH(request: NextRequest) {
+  const auth = await requireAdmin();
+  if (!auth.ok)
+    return NextResponse.json({ error: "No autorizado" }, { status: auth.status });
+  const { admin } = auth;
+
+  let body: { id?: string; password?: string; nombre?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Cuerpo inválido" }, { status: 400 });
+  }
+  if (!body.id)
+    return NextResponse.json({ error: "Falta el id." }, { status: 400 });
+
+  if (body.password !== undefined) {
+    if (body.password.length < 8)
+      return NextResponse.json(
+        { error: "La contraseña debe tener al menos 8 caracteres." },
+        { status: 400 },
+      );
+    const { error } = await admin.auth.admin.updateUserById(body.id, {
+      password: body.password,
+    });
+    if (error)
+      return NextResponse.json({ error: error.message }, { status: 400 });
+  }
+
+  if (body.nombre !== undefined) {
+    await admin
+      .from("profiles")
+      .update({ nombre: body.nombre.trim() })
+      .eq("id", body.id);
+  }
+
+  return NextResponse.json({ ok: true });
+}
+
+// DELETE — eliminar usuario por completo.
+export async function DELETE(request: NextRequest) {
+  const auth = await requireAdmin();
+  if (!auth.ok)
+    return NextResponse.json({ error: "No autorizado" }, { status: auth.status });
+  const { admin, callerId } = auth;
+
+  const id = new URL(request.url).searchParams.get("id");
+  if (!id) return NextResponse.json({ error: "Falta el id." }, { status: 400 });
+  if (id === callerId)
+    return NextResponse.json(
+      { error: "No puedes eliminarte a ti mismo." },
+      { status: 400 },
+    );
+
+  const { error } = await admin.auth.admin.deleteUser(id);
+  if (error)
+    return NextResponse.json({ error: error.message }, { status: 400 });
+  return NextResponse.json({ ok: true });
 }

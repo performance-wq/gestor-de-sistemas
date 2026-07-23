@@ -1,76 +1,41 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-type Modo = "login" | "registro";
-
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const params = useSearchParams();
   const supabase = createClient();
-  const [modo, setModo] = useState<Modo>("login");
-  const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState("");
-  const [aviso, setAviso] = useState("");
+
+  const inactivo = params.get("inactivo") === "1";
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setCargando(true);
     setError("");
-    setAviso("");
-
     try {
-      if (modo === "login") {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (error) {
-          setError(
-            error.message.toLowerCase().includes("not confirmed")
-              ? "Debes confirmar tu correo antes de entrar. Revisa tu bandeja."
-              : "Correo o contraseña incorrectos.",
-          );
-          setCargando(false);
-          return;
-        }
-        router.push("/dashboard");
-        router.refresh();
-      } else {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: { nombre },
-            emailRedirectTo: `${window.location.origin}/systemspex/auth/callback`,
-          },
-        });
-        if (error) {
-          setError(error.message);
-          setCargando(false);
-          return;
-        }
-        if (data.session) {
-          router.push("/dashboard");
-          router.refresh();
-        } else {
-          setAviso(
-            "Cuenta creada. Revisa tu correo para confirmar y luego inicia sesión.",
-          );
-          setModo("login");
-          setCargando(false);
-        }
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error) {
+        setError("Correo o contraseña incorrectos.");
+        setCargando(false);
+        return;
       }
-    } catch (err) {
+      router.push("/dashboard");
+      router.refresh();
+    } catch {
       setError(
-        "No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.",
+        "No se pudo conectar con el servidor. Inténtalo de nuevo en un momento.",
       );
       setCargando(false);
-      console.error("Error de autenticación:", err);
     }
   }
 
@@ -82,26 +47,17 @@ export default function LoginPage() {
             S
           </div>
           <h1 className="text-xl font-semibold tracking-tight">Systems PEX</h1>
-          <p className="mt-1 text-sm text-muted">
-            {modo === "login"
-              ? "Inicia sesión para continuar"
-              : "Crea tu cuenta"}
-          </p>
+          <p className="mt-1 text-sm text-muted">Inicia sesión para continuar</p>
         </div>
 
         <form
           onSubmit={submit}
           className="space-y-4 rounded-2xl border border-border bg-surface p-6 shadow-sm"
         >
-          {modo === "registro" && (
-            <div>
-              <label className="mb-1.5 block text-sm font-medium">Nombre</label>
-              <input
-                value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
-                className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
-              />
-            </div>
+          {inactivo && (
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700">
+              Tu cuenta está desactivada. Contacta al administrador.
+            </p>
           )}
           <div>
             <label className="mb-1.5 block text-sm font-medium">Correo</label>
@@ -125,36 +81,28 @@ export default function LoginPage() {
           </div>
 
           {error && <p className="text-sm text-red-600">{error}</p>}
-          {aviso && <p className="text-sm text-emerald-600">{aviso}</p>}
 
           <button
             type="submit"
             disabled={cargando}
             className="w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"
           >
-            {cargando
-              ? "Un momento…"
-              : modo === "login"
-                ? "Entrar"
-                : "Crear cuenta"}
+            {cargando ? "Un momento…" : "Entrar"}
           </button>
 
-          <p className="text-center text-sm text-muted">
-            {modo === "login" ? "¿No tienes cuenta? " : "¿Ya tienes cuenta? "}
-            <button
-              type="button"
-              onClick={() => {
-                setModo(modo === "login" ? "registro" : "login");
-                setError("");
-                setAviso("");
-              }}
-              className="font-medium text-accent hover:underline"
-            >
-              {modo === "login" ? "Regístrate" : "Inicia sesión"}
-            </button>
+          <p className="text-center text-xs text-muted">
+            El acceso es privado. Las cuentas las crea el administrador.
           </p>
         </form>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   );
 }

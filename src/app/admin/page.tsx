@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/store";
 import { createClient } from "@/lib/supabase/client";
-import { formatFecha } from "@/lib/ui";
+import { formatFecha, formatFechaHora } from "@/lib/ui";
 import { Breadcrumb } from "@/components/Breadcrumb";
 
 interface Perfil {
@@ -14,6 +14,8 @@ interface Perfil {
   rol: "admin" | "subcuenta";
   activo: boolean;
   created_at: string;
+  ultimo_acceso?: string | null;
+  creado_por_nombre?: string | null;
 }
 
 export default function AdminPage() {
@@ -25,7 +27,6 @@ export default function AdminPage() {
   >([]);
   const [cargando, setCargando] = useState(true);
 
-  // Formulario de creación
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -38,14 +39,29 @@ export default function AdminPage() {
   const esAdmin = usuario?.rol === "admin";
 
   const cargar = useCallback(async () => {
-    const [u, a] = await Promise.all([
-      supabase
+    try {
+      const r = await fetch("/api/admin/usuarios", { cache: "no-store" });
+      if (r.ok) {
+        const j = await r.json();
+        setUsuarios(j.usuarios as Perfil[]);
+      } else {
+        throw new Error("api");
+      }
+    } catch {
+      // Respaldo (p. ej. en local sin acceso server): datos base sin último acceso.
+      const { data } = await supabase
         .from("profiles")
-        .select("id,email,nombre,rol,activo,created_at")
-        .order("created_at", { ascending: true }),
-      supabase.from("asignaciones").select("proyecto_id,user_id"),
-    ]);
-    if (u.data) setUsuarios(u.data as Perfil[]);
+        .select("id,email,nombre,rol,activo,created_at,creado_por")
+        .order("created_at", { ascending: true });
+      setUsuarios(
+        (data ?? []).map((p) => ({
+          ...(p as Perfil),
+          ultimo_acceso: null,
+          creado_por_nombre: null,
+        })),
+      );
+    }
+    const a = await supabase.from("asignaciones").select("proyecto_id,user_id");
     if (a.data) setAsignaciones(a.data);
     setCargando(false);
   }, [supabase]);
@@ -78,9 +94,8 @@ export default function AdminPage() {
         body: JSON.stringify({ email, nombre, password, rol }),
       });
       const j = await r.json();
-      if (!r.ok) {
-        setMsg({ tipo: "err", texto: j.error ?? "No se pudo crear." });
-      } else {
+      if (!r.ok) setMsg({ tipo: "err", texto: j.error ?? "No se pudo crear." });
+      else {
         setMsg({ tipo: "ok", texto: `Usuario ${email} creado.` });
         setNombre("");
         setEmail("");
@@ -91,22 +106,56 @@ export default function AdminPage() {
     } catch {
       setMsg({
         tipo: "err",
-        texto: "Error de conexión. En local puede fallar; funciona en producción.",
+        texto:
+          "Error de conexión. La creación de usuarios funciona en la versión publicada.",
       });
     }
     setCreando(false);
   }
 
-  async function toggle(id: string, campo: "activo", valor: boolean) {
+  async function toggleActivo(id: string, activo: boolean) {
     setUsuarios((prev) =>
-      prev.map((u) => (u.id === id ? { ...u, [campo]: valor } : u)),
+      prev.map((u) => (u.id === id ? { ...u, activo } : u)),
     );
-    await supabase.from("profiles").update({ [campo]: valor }).eq("id", id);
+    await supabase.from("profiles").update({ activo }).eq("id", id);
   }
 
   async function cambiarRol(id: string, r: "admin" | "subcuenta") {
     setUsuarios((prev) => prev.map((u) => (u.id === id ? { ...u, rol: r } : u)));
     await supabase.from("profiles").update({ rol: r }).eq("id", id);
+  }
+
+  async function resetPassword(id: string) {
+    const pw = window.prompt(
+      "Nueva contraseña temporal (mínimo 8 caracteres):",
+    );
+    if (!pw) return;
+    const r = await fetch("/api/admin/usuarios", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, password: pw }),
+    });
+    const j = await r.json();
+    setMsg(
+      r.ok
+        ? { tipo: "ok", texto: "Contraseña restablecida. Comunícasela al usuario." }
+        : { tipo: "err", texto: j.error ?? "No se pudo restablecer." },
+    );
+  }
+
+  async function eliminarUsuario(id: string, nombre: string) {
+    if (
+      !confirm(
+        `¿Eliminar a ${nombre}? Se borrará su cuenta por completo. Esta acción no se puede deshacer.`,
+      )
+    )
+      return;
+    const r = await fetch("/api/admin/usuarios?id=" + id, { method: "DELETE" });
+    const j = await r.json();
+    if (r.ok) {
+      setUsuarios((prev) => prev.filter((u) => u.id !== id));
+      setMsg({ tipo: "ok", texto: "Usuario eliminado." });
+    } else setMsg({ tipo: "err", texto: j.error ?? "No se pudo eliminar." });
   }
 
   async function toggleAsignacion(
@@ -141,7 +190,7 @@ export default function AdminPage() {
         Consola de administración
       </h1>
       <p className="mt-1 text-sm text-muted">
-        Gestiona usuarios, roles y qué proyectos ve cada colaborador.
+        Gestión privada de usuarios, roles y acceso a proyectos.
       </p>
 
       {/* Crear usuario */}
@@ -210,13 +259,12 @@ export default function AdminPage() {
             {msg.texto}
           </p>
         )}
-        <p className="mt-2 text-xs text-muted">
-          El usuario podrá entrar con esa contraseña temporal (comunícasela).
-        </p>
       </div>
 
       {/* Lista de usuarios */}
-      <h2 className="mt-8 text-lg font-semibold">Usuarios</h2>
+      <h2 className="mt-8 text-lg font-semibold">
+        Usuarios ({usuarios.length})
+      </h2>
       <div className="mt-4 space-y-3">
         {cargando ? (
           <p className="text-sm text-muted">Cargando usuarios…</p>
@@ -228,26 +276,35 @@ export default function AdminPage() {
                 key={u.id}
                 className="rounded-xl border border-border bg-surface p-5 shadow-sm"
               >
-                <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span className="font-medium">{u.nombre || u.email}</span>
                       {esYo && (
                         <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
                           tú
                         </span>
                       )}
-                      {!u.activo && (
-                        <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs text-red-600">
-                          inactivo
-                        </span>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                          u.activo
+                            ? "bg-emerald-50 text-emerald-700"
+                            : "bg-red-50 text-red-600"
+                        }`}
+                      >
+                        {u.activo ? "Activo" : "Inactivo"}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 text-xs text-muted">{u.email}</p>
+                    <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted">
+                      <span>Alta: {formatFecha(u.created_at)}</span>
+                      <span>Último acceso: {formatFechaHora(u.ultimo_acceso)}</span>
+                      {u.creado_por_nombre && (
+                        <span>Creado por: {u.creado_por_nombre}</span>
                       )}
                     </div>
-                    <p className="text-xs text-muted">
-                      {u.email} · alta {formatFecha(u.created_at)}
-                    </p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <select
                       value={u.rol}
                       disabled={esYo}
@@ -260,7 +317,7 @@ export default function AdminPage() {
                       <option value="admin">Administrador</option>
                     </select>
                     <button
-                      onClick={() => toggle(u.id, "activo", !u.activo)}
+                      onClick={() => toggleActivo(u.id, !u.activo)}
                       disabled={esYo}
                       className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-40 ${
                         u.activo
@@ -269,6 +326,19 @@ export default function AdminPage() {
                       }`}
                     >
                       {u.activo ? "Desactivar" : "Activar"}
+                    </button>
+                    <button
+                      onClick={() => resetPassword(u.id)}
+                      className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-muted transition-colors hover:bg-slate-50 hover:text-foreground"
+                    >
+                      Contraseña
+                    </button>
+                    <button
+                      onClick={() => eliminarUsuario(u.id, u.nombre || u.email)}
+                      disabled={esYo}
+                      className="rounded-lg px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-40"
+                    >
+                      Eliminar
                     </button>
                   </div>
                 </div>
@@ -287,8 +357,7 @@ export default function AdminPage() {
                       <div className="flex flex-wrap gap-2">
                         {proyectos.map((p) => {
                           const asignado = asignaciones.some(
-                            (a) =>
-                              a.proyecto_id === p.id && a.user_id === u.id,
+                            (a) => a.proyecto_id === p.id && a.user_id === u.id,
                           );
                           return (
                             <button
