@@ -77,6 +77,7 @@ function mapPunto(p: Row): Punto {
     programacion: (p.programacion as string) ?? undefined,
     fijo: (p.fijo as boolean) ?? false,
     actualizadoEn: (p.actualizado_en as string) ?? null,
+    actualizadoPorNombre: (p.actualizado_por_nombre as string) ?? null,
   };
 }
 
@@ -110,6 +111,7 @@ function mapProyecto(p: Row): Proyecto {
     evidenciaVideo: (p.evidencia_video as string) ?? undefined,
     creado: (p.created_at as string) ?? "",
     actualizadoEn: (p.actualizado_en as string) ?? null,
+    actualizadoPorNombre: (p.actualizado_por_nombre as string) ?? null,
     sistemas,
   };
 }

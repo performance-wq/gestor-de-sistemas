@@ -141,7 +141,10 @@ export default function PuntoView() {
             )}
             {punto.actualizadoEn && (
               <span className="text-xs text-muted">
-                Última edición: {formatFechaHora(punto.actualizadoEn)}
+                {punto.actualizadoPorNombre
+                  ? `Subido por ${punto.actualizadoPorNombre} · `
+                  : "Última edición: "}
+                {formatFechaHora(punto.actualizadoEn)}
               </span>
             )}
           </div>

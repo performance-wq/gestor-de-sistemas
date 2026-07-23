@@ -15,6 +15,7 @@ export interface Punto {
   programacion?: string; // ej. "Después de 1 día"
   fijo?: boolean;
   actualizadoEn?: string | null;
+  actualizadoPorNombre?: string | null;
 }
 
 export interface Sistema {
@@ -42,6 +43,7 @@ export interface Proyecto {
   sistemas: Sistema[];
   creado: string;
   actualizadoEn?: string | null;
+  actualizadoPorNombre?: string | null;
 }
 
 export interface EntradaAuditoria {
