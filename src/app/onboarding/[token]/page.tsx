@@ -177,25 +177,60 @@ export default function OnboardingPage() {
   if (fase === "intro") {
     const yaEmpezado = Object.keys(respuestas).length > 0;
     return (
-      <Centro>
-        <p className="text-sm font-medium uppercase tracking-widest text-accent">
-          Onboarding
-        </p>
-        <h1 className="mt-4 max-w-xl text-3xl font-semibold leading-tight sm:text-4xl">
-          {yaEmpezado ? "Continuemos donde quedaste" : "¡Hola! Cuéntanos de tu negocio"}
-        </h1>
-        <p className="mt-4 max-w-md text-muted">
-          {proyecto && <span className="font-medium">{proyecto} · </span>}
-          Son {total} preguntas, una a la vez. Puedes cerrar y volver cuando
-          quieras: tus respuestas se guardan solas.
-        </p>
-        <button
-          onClick={() => setFase("form")}
-          className="mt-8 rounded-xl bg-accent px-8 py-3.5 text-base font-medium text-white shadow-sm transition-opacity hover:opacity-90"
-        >
-          {yaEmpezado ? "Continuar" : "Comenzar"} →
-        </button>
-      </Centro>
+      <div className="flex min-h-dvh items-center justify-center px-5 py-12">
+        <div className="w-full max-w-xl animate-[fadeIn_.35s_ease-out]">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-sm font-bold text-white">
+              S
+            </span>
+            <span className="text-sm font-semibold tracking-tight">
+              Systems PEX
+            </span>
+          </div>
+
+          <h1 className="mt-8 text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
+            ¡Bienvenido a Systems PEX! <span className="inline-block">👋</span>
+          </h1>
+
+          <p className="mt-5 text-lg text-muted">Gracias por confiar en nosotros.</p>
+
+          <p className="mt-4 leading-relaxed text-muted">
+            Este formulario nos permitirá recopilar toda la información
+            necesaria para configurar tu CRM, automatizaciones, inteligencia
+            artificial y demás sistemas de manera personalizada.
+          </p>
+          <p className="mt-3 leading-relaxed text-muted">
+            La información que compartas nos ayudará a implementar tu proyecto
+            de forma más rápida, organizada y precisa.
+          </p>
+
+          <div className="mt-7 space-y-2.5 rounded-xl border border-border bg-surface p-4">
+            <Dato icono="⏱️" texto="Tiempo estimado: 10 a 15 minutos." />
+            <Dato icono="📱" texto="Puedes completarlo desde cualquier dispositivo." />
+            <Dato
+              icono="💾"
+              texto="Tu progreso se guarda solo: puedes cerrar y continuar más tarde."
+            />
+          </div>
+
+          {yaEmpezado && (
+            <p className="mt-5 rounded-lg bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+              Ya tienes respuestas guardadas. Continuaremos donde te quedaste.
+            </p>
+          )}
+
+          <button
+            onClick={() => setFase("form")}
+            className="mt-8 w-full rounded-xl bg-accent px-8 py-4 text-base font-medium text-white shadow-sm transition-opacity hover:opacity-90 sm:w-auto"
+          >
+            {yaEmpezado ? "Continuar Onboarding" : "Comenzar Onboarding"} →
+          </button>
+
+          {proyecto && (
+            <p className="mt-6 text-xs text-muted">Proyecto: {proyecto}</p>
+          )}
+        </div>
+      </div>
     );
   }
 
@@ -274,6 +309,15 @@ export default function OnboardingPage() {
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function Dato({ icono, texto }: { icono: string; texto: string }) {
+  return (
+    <div className="flex items-start gap-2.5 text-sm text-muted">
+      <span className="shrink-0">{icono}</span>
+      <span>{texto}</span>
     </div>
   );
 }

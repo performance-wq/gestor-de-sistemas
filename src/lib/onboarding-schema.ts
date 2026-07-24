@@ -80,6 +80,18 @@ export const MAX_MB = 25;
 
 export const SECCIONES: SeccionOnboarding[] = [
   {
+    id: "personal",
+    titulo: "Información Personal",
+    descripcion: "Para saber con quién estamos trabajando.",
+    preguntas: [
+      { id: "per_nombre", titulo: "¿Cuál es tu nombre?", tipo: "texto", placeholder: "Ej. María" },
+      { id: "per_apellidos", titulo: "¿Cuáles son tus apellidos?", tipo: "texto", placeholder: "Ej. González Pérez" },
+      { id: "per_email", titulo: "¿Cuál es tu correo electrónico?", tipo: "email", placeholder: "tucorreo@empresa.com" },
+      { id: "per_whatsapp", titulo: "¿Cuál es tu número de teléfono (WhatsApp)?", tipo: "tel", ayuda: "Incluye el código de país.", placeholder: "+52 55 1234 5678" },
+      { id: "per_cargo", titulo: "¿Cuál es tu cargo dentro de la empresa?", tipo: "texto", opcional: true, placeholder: "Ej. Dueño, Gerente de Marketing" },
+    ],
+  },
+  {
     id: "negocio",
     titulo: "Información del Negocio",
     descripcion: "Cuéntanos de qué se trata tu negocio.",
@@ -89,7 +101,6 @@ export const SECCIONES: SeccionOnboarding[] = [
       { id: "neg_promesa", titulo: "¿Cuál es tu promesa principal?", tipo: "textarea", ayuda: "El resultado principal que le prometes a tu cliente." },
       { id: "neg_mision", titulo: "Misión o visión", tipo: "textarea", opcional: true },
       { id: "neg_diferenciadores", titulo: "¿Cuáles son tus principales diferenciadores?", tipo: "textarea", ayuda: "¿Por qué te elegirían a ti y no a la competencia?" },
-      { id: "neg_historia", titulo: "Historia del negocio", tipo: "textarea", opcional: true },
     ],
   },
   {
@@ -98,7 +109,6 @@ export const SECCIONES: SeccionOnboarding[] = [
     descripcion: "Para hablarle exactamente a quien te compra.",
     preguntas: [
       { id: "av_descripcion", titulo: "Describe a tu cliente ideal", tipo: "textarea" },
-      { id: "av_edad", titulo: "Edad aproximada", tipo: "texto", placeholder: "Ej. 30 a 45 años" },
       { id: "av_ocupacion", titulo: "Ocupación o perfil", tipo: "texto" },
       { id: "av_dolores", titulo: "¿Cuáles son sus principales problemas o dolores?", tipo: "textarea" },
       { id: "av_objetivos", titulo: "Cinco objetivos o deseos de tu cliente", tipo: "lista", cantidad: 5 },
@@ -139,7 +149,7 @@ export const SECCIONES: SeccionOnboarding[] = [
     titulo: "Contenido para Ventas",
     descripcion: "Material que usaremos en tus automatizaciones.",
     preguntas: [
-      { id: "co_faq", titulo: "Diez preguntas frecuentes con sus respuestas", tipo: "lista_pares", cantidad: 10 },
+      { id: "co_faq", titulo: "Cinco preguntas frecuentes y cómo las responderías", tipo: "lista_pares", cantidad: 5 },
       { id: "co_testimonios", titulo: "Sube 2 imágenes o videos de testimonios", tipo: "media", cantidad: 2 },
       { id: "co_clientes", titulo: "Sube 2 imágenes o videos de clientes", tipo: "media", cantidad: 2 },
       { id: "co_producto", titulo: "Sube 2 imágenes o videos del producto o servicio", tipo: "media", cantidad: 2 },

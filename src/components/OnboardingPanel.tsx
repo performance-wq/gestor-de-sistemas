@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Modal } from "./Modal";
 import { Toast } from "./Toast";
 import { OnboardingRespuestas } from "./OnboardingRespuestas";
+import { OnboardingAdmin } from "./OnboardingAdmin";
 import { descargarOnboardingZip } from "@/lib/onboarding-export";
 import type { Respuestas } from "@/lib/onboarding-schema";
 import { formatFechaHora } from "@/lib/ui";
@@ -30,20 +31,23 @@ export function OnboardingPanel({
   const [cargando, setCargando] = useState(true);
   const [generando, setGenerando] = useState(false);
   const [preview, setPreview] = useState(false);
+  const [admin, setAdmin] = useState(false);
   const [descargando, setDescargando] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  useEffect(() => {
-    (async () => {
-      const { data } = await supabase
-        .from("onboarding")
-        .select("token, estado, respuestas, enviado_en")
-        .eq("proyecto_id", proyectoId)
-        .maybeSingle();
-      setRow(data as OnbRow | null);
-      setCargando(false);
-    })();
+  const cargar = useCallback(async () => {
+    const { data } = await supabase
+      .from("onboarding")
+      .select("token, estado, respuestas, enviado_en")
+      .eq("proyecto_id", proyectoId)
+      .maybeSingle();
+    setRow(data as OnbRow | null);
+    setCargando(false);
   }, [supabase, proyectoId]);
+
+  useEffect(() => {
+    cargar();
+  }, [cargar]);
 
   async function generarEnlace() {
     setGenerando(true);
@@ -175,7 +179,13 @@ export function OnboardingPanel({
               disabled={!tieneRespuestas || !!descargando}
               className="rounded-lg border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-slate-50 disabled:opacity-50"
             >
-              {descargando ?? "⬇️ Descargar (ZIP)"}
+              {descargando ?? "⬇️ Descargar respuestas"}
+            </button>
+            <button
+              onClick={() => setAdmin(true)}
+              className="rounded-lg border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-slate-50"
+            >
+              ⚙️ Administrar respuestas
             </button>
             {!tieneRespuestas && (
               <span className="text-xs text-muted">
@@ -210,6 +220,21 @@ export function OnboardingPanel({
       >
         {row && <OnboardingRespuestas respuestas={row.respuestas ?? {}} />}
       </Modal>
+
+      {/* Administración: historial + reinicio seguro */}
+      {row && (
+        <OnboardingAdmin
+          abierto={admin}
+          onClose={() => setAdmin(false)}
+          proyectoId={proyectoId}
+          proyectoNombre={proyectoNombre}
+          cliente={cliente}
+          estado={row.estado}
+          respuestas={row.respuestas ?? {}}
+          onReiniciado={cargar}
+          onAviso={setToast}
+        />
+      )}
 
       {toast && <Toast mensaje={toast} onClose={() => setToast(null)} />}
     </section>
