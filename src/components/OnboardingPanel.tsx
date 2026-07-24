@@ -2,16 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { ArchivoPreview } from "./ArchivoPreview";
+import { Modal } from "./Modal";
 import { Toast } from "./Toast";
-import {
-  SECCIONES,
-  esTipoArchivo,
-  type ArchivoSubido,
-  type Par,
-  type Pregunta,
-  type Respuestas,
-} from "@/lib/onboarding-schema";
+import { OnboardingRespuestas } from "./OnboardingRespuestas";
+import { descargarOnboardingZip } from "@/lib/onboarding-export";
+import type { Respuestas } from "@/lib/onboarding-schema";
 import { formatFechaHora } from "@/lib/ui";
 
 interface OnbRow {
@@ -21,12 +16,21 @@ interface OnbRow {
   enviado_en: string | null;
 }
 
-export function OnboardingPanel({ proyectoId }: { proyectoId: string }) {
+export function OnboardingPanel({
+  proyectoId,
+  proyectoNombre,
+  cliente,
+}: {
+  proyectoId: string;
+  proyectoNombre: string;
+  cliente?: string;
+}) {
   const supabase = createClient();
   const [row, setRow] = useState<OnbRow | null>(null);
   const [cargando, setCargando] = useState(true);
   const [generando, setGenerando] = useState(false);
-  const [abierto, setAbierto] = useState<string | null>(SECCIONES[0].id);
+  const [preview, setPreview] = useState(false);
+  const [descargando, setDescargando] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
@@ -68,16 +72,32 @@ export function OnboardingPanel({ proyectoId }: { proyectoId: string }) {
     }
   }
 
+  async function descargar() {
+    if (!row) return;
+    setDescargando("Preparando…");
+    const { fallidos } = await descargarOnboardingZip(
+      proyectoNombre,
+      cliente,
+      row.respuestas ?? {},
+      (h, t) => setDescargando(t ? `Descargando archivos ${h}/${t}…` : null),
+    );
+    setDescargando(null);
+    setToast(
+      fallidos > 0
+        ? `ZIP listo (${fallidos} archivo(s) no se pudieron incluir)`
+        : "ZIP descargado",
+    );
+  }
+
   const completado = row?.estado === "completado";
-  const tieneRespuestas =
-    row && Object.keys(row.respuestas ?? {}).length > 0;
+  const tieneRespuestas = !!row && Object.keys(row.respuestas ?? {}).length > 0;
 
   return (
     <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <span className="text-lg">📋</span>
-          <h2 className="text-lg font-semibold">Onboarding</h2>
+          <h2 className="text-lg font-semibold">Formulario de onboarding</h2>
           {row && (
             <span
               className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
@@ -114,8 +134,11 @@ export function OnboardingPanel({ proyectoId }: { proyectoId: string }) {
         </div>
       ) : (
         <>
-          {/* Enlace */}
-          <div className="mt-4 flex flex-wrap items-center gap-2">
+          {/* Enlace del formulario */}
+          <label className="mt-5 block text-xs font-medium uppercase tracking-wide text-muted">
+            Link del formulario
+          </label>
+          <div className="mt-1.5 flex flex-wrap items-center gap-2">
             <input
               readOnly
               value={enlace}
@@ -138,129 +161,57 @@ export function OnboardingPanel({ proyectoId }: { proyectoId: string }) {
             </a>
           </div>
 
-          {/* Respuestas */}
-          {tieneRespuestas ? (
-            <div className="mt-6 space-y-2.5">
-              {SECCIONES.map((sec) => {
-                const respondidas = sec.preguntas.filter((p) =>
-                  tieneValor(row.respuestas[p.id]),
-                ).length;
-                const open = abierto === sec.id;
-                return (
-                  <div
-                    key={sec.id}
-                    className="overflow-hidden rounded-xl border border-border"
-                  >
-                    <button
-                      onClick={() => setAbierto(open ? null : sec.id)}
-                      className="flex w-full items-center justify-between gap-3 bg-slate-50 px-4 py-3 text-left transition-colors hover:bg-slate-100"
-                    >
-                      <span className="font-medium">{sec.titulo}</span>
-                      <span className="flex items-center gap-2 text-xs text-muted">
-                        {respondidas}/{sec.preguntas.length}
-                        <span
-                          className={`transition-transform ${open ? "rotate-90" : ""}`}
-                        >
-                          ›
-                        </span>
-                      </span>
-                    </button>
-                    {open && (
-                      <div className="divide-y divide-border">
-                        {sec.preguntas.map((p) => (
-                          <RespuestaVista
-                            key={p.id}
-                            pregunta={p}
-                            valor={row.respuestas[p.id]}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <p className="mt-4 text-sm text-muted">
-              Aún no hay respuestas. Comparte el enlace con el cliente.
+          {/* Acciones sobre las respuestas */}
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setPreview(true)}
+              disabled={!tieneRespuestas}
+              className="rounded-lg border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-slate-50 disabled:opacity-50"
+            >
+              👁️ Vista previa
+            </button>
+            <button
+              onClick={descargar}
+              disabled={!tieneRespuestas || !!descargando}
+              className="rounded-lg border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-slate-50 disabled:opacity-50"
+            >
+              {descargando ?? "⬇️ Descargar (ZIP)"}
+            </button>
+            {!tieneRespuestas && (
+              <span className="text-xs text-muted">
+                Aún no hay respuestas. Comparte el enlace con el cliente.
+              </span>
+            )}
+          </div>
+
+          {tieneRespuestas && (
+            <p className="mt-3 text-xs text-muted">
+              El ZIP incluye <span className="font-medium">respuestas.md</span> y
+              las carpetas de imágenes, videos y documentos — listo para usar con
+              IA.
             </p>
           )}
         </>
       )}
 
+      {/* Modal de vista previa */}
+      <Modal
+        abierto={preview}
+        onClose={() => setPreview(false)}
+        titulo={`Vista previa · ${proyectoNombre}`}
+        acciones={
+          <button
+            onClick={() => setPreview(false)}
+            className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+          >
+            Cerrar
+          </button>
+        }
+      >
+        {row && <OnboardingRespuestas respuestas={row.respuestas ?? {}} />}
+      </Modal>
+
       {toast && <Toast mensaje={toast} onClose={() => setToast(null)} />}
     </section>
-  );
-}
-
-function tieneValor(v: unknown): boolean {
-  if (v === undefined || v === null) return false;
-  if (typeof v === "string") return v.trim() !== "";
-  if (Array.isArray(v)) return v.length > 0;
-  return true;
-}
-
-function RespuestaVista({
-  pregunta,
-  valor,
-}: {
-  pregunta: Pregunta;
-  valor: unknown;
-}) {
-  const vacio = !tieneValor(valor);
-
-  return (
-    <div className="px-4 py-3.5">
-      <p className="text-sm font-medium text-foreground">{pregunta.titulo}</p>
-      <div className="mt-1.5 text-sm text-muted">
-        {vacio ? (
-          <span className="italic text-slate-400">Sin responder</span>
-        ) : esTipoArchivo(pregunta.tipo) ? (
-          <div
-            className={
-              pregunta.tipo === "documentos"
-                ? "space-y-2"
-                : "grid grid-cols-2 gap-2 sm:grid-cols-3"
-            }
-          >
-            {(valor as ArchivoSubido[]).map((a) => (
-              <ArchivoPreview key={a.path} archivo={a} />
-            ))}
-          </div>
-        ) : pregunta.tipo === "lista" ? (
-          <ol className="list-decimal space-y-0.5 pl-5">
-            {(valor as string[])
-              .filter((x) => x?.trim())
-              .map((x, i) => (
-                <li key={i}>{x}</li>
-              ))}
-          </ol>
-        ) : pregunta.tipo === "lista_pares" ? (
-          <ul className="space-y-2">
-            {(valor as Par[])
-              .filter((x) => x?.p?.trim())
-              .map((x, i) => (
-                <li key={i}>
-                  <p className="font-medium text-foreground">{x.p}</p>
-                  <p className="whitespace-pre-wrap">{x.r}</p>
-                </li>
-              ))}
-          </ul>
-        ) : pregunta.tipo === "url" ? (
-          <a
-            href={valor as string}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="break-all text-accent underline underline-offset-2"
-          >
-            {valor as string}
-          </a>
-        ) : (
-          <p className="whitespace-pre-wrap text-foreground/90">
-            {valor as string}
-          </p>
-        )}
-      </div>
-    </div>
   );
 }
