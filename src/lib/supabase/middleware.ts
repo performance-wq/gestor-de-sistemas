@@ -35,7 +35,12 @@ export async function updateSession(request: NextRequest) {
   const user = session?.user ?? null;
 
   const path = request.nextUrl.pathname;
-  const esPublica = path.startsWith("/login") || path.startsWith("/auth");
+  // /onboarding/<token> es público: lo responde el cliente final, que no
+  // tiene cuenta. El acceso está acotado a su token por RLS.
+  const esPublica =
+    path.startsWith("/login") ||
+    path.startsWith("/auth") ||
+    path.startsWith("/onboarding");
 
   if (!user && !esPublica) {
     const url = request.nextUrl.clone();

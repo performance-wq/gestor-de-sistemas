@@ -10,6 +10,7 @@ import type { Estado } from "@/lib/types";
 import { ProgressBar } from "@/components/ProgressBar";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { DatosControl } from "@/components/DatosControl";
+import { OnboardingPanel } from "@/components/OnboardingPanel";
 
 export default function ProyectoView() {
   const { id } = useParams<{ id: string }>();
@@ -102,7 +103,12 @@ export default function ProyectoView() {
         </div>
       </div>
 
-      {/* Sistemas */}
+      {/* 1 · Onboarding */}
+      <div className="mt-8">
+        <OnboardingPanel proyectoId={proyecto.id} />
+      </div>
+
+      {/* 2 · Sistemas */}
       <div className="mt-8 flex items-center justify-between">
         <h2 className="text-lg font-semibold">Sistemas</h2>
       </div>
