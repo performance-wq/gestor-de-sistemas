@@ -11,6 +11,7 @@ import { ProgressBar } from "@/components/ProgressBar";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { DatosControl } from "@/components/DatosControl";
 import { OnboardingPanel } from "@/components/OnboardingPanel";
+import { ChecklistGestion } from "@/components/ChecklistGestion";
 
 type Fase = "onboarding" | "implementacion" | "performance";
 
@@ -136,6 +137,9 @@ export default function ProyectoView() {
           </div>
         </div>
       </div>
+
+      {/* ---------- Checklist de gestión (módulo independiente) ---------- */}
+      <ChecklistGestion proyectoId={proyecto.id} />
 
       {/* ---------- Navegación por fases ---------- */}
       <div className="mt-6 flex gap-1.5 overflow-x-auto rounded-xl border border-border bg-surface p-1.5 shadow-sm">

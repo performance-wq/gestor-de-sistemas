@@ -46,6 +46,16 @@ export interface Proyecto {
   actualizadoPorNombre?: string | null;
 }
 
+export interface ChecklistItem {
+  id: string;
+  categoria: string;
+  titulo: string;
+  orden: number;
+  completado: boolean;
+  completadoPorNombre?: string | null;
+  completadoEn?: string | null;
+}
+
 export interface EntradaAuditoria {
   id: string;
   userNombre: string;
