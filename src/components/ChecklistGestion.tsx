@@ -124,21 +124,21 @@ export function ChecklistGestion({ proyectoId }: { proyectoId: string }) {
 
       {/* Lista única, numerada, en columnas balanceadas */}
       {abierto && (
-        <ul className="mt-5 gap-x-6 [column-gap:1.5rem] columns-1 sm:columns-2 lg:columns-4 xl:columns-5">
+        <ul className="mt-5 [column-gap:1.75rem] columns-1 sm:columns-2 lg:columns-4">
           {items.map((it) => (
-            <li key={it.id} className="mb-0.5 break-inside-avoid">
+            <li key={it.id} className="mb-2 break-inside-avoid">
               <button
                 onClick={() => toggle(it)}
                 title={
                   it.completado && it.completadoPorNombre
-                    ? `Completado por ${it.completadoPorNombre}${
+                    ? `${it.titulo} · Completado por ${it.completadoPorNombre}${
                         it.completadoEn
                           ? ` · ${formatFechaHora(it.completadoEn)}`
                           : ""
                       }`
-                    : "Marcar como completado"
+                    : it.titulo
                 }
-                className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm transition-colors hover:bg-slate-100 ${
+                className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm transition-colors hover:bg-slate-100 ${
                   it.completado ? "text-muted" : ""
                 }`}
               >
