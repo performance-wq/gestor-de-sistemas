@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { ChecklistItem } from "@/lib/types";
 import { ProgressBar } from "./ProgressBar";
@@ -28,21 +28,23 @@ function map(f: Fila): ChecklistItem {
   };
 }
 
+const SELECT =
+  "id, categoria, titulo, orden, completado, completado_por_nombre, completado_en";
+
 // Checklist operativo interno del proyecto. Módulo independiente:
 // no toca onboarding, sistemas ni performance.
 export function ChecklistGestion({ proyectoId }: { proyectoId: string }) {
   const supabase = createClient();
   const [items, setItems] = useState<ChecklistItem[]>([]);
   const [cargado, setCargado] = useState(false);
+  const [abierto, setAbierto] = useState(false);
 
   useEffect(() => {
     let vivo = true;
     (async () => {
       const { data } = await supabase
         .from("checklist_items")
-        .select(
-          "id, categoria, titulo, orden, completado, completado_por_nombre, completado_en",
-        )
+        .select(SELECT)
         .eq("proyecto_id", proyectoId)
         .order("orden", { ascending: true });
       if (!vivo) return;
@@ -54,27 +56,12 @@ export function ChecklistGestion({ proyectoId }: { proyectoId: string }) {
     };
   }, [supabase, proyectoId]);
 
-  // Agrupar por categoría preservando el orden de aparición.
-  const columnas = useMemo(() => {
-    const grupos: { categoria: string; items: ChecklistItem[] }[] = [];
-    for (const it of items) {
-      let g = grupos.find((x) => x.categoria === it.categoria);
-      if (!g) {
-        g = { categoria: it.categoria, items: [] };
-        grupos.push(g);
-      }
-      g.items.push(it);
-    }
-    return grupos;
-  }, [items]);
-
   const total = items.length;
   const completos = items.filter((i) => i.completado).length;
   const pct = total ? Math.round((completos / total) * 100) : 0;
 
   async function toggle(item: ChecklistItem) {
     const nuevo = !item.completado;
-    // Optimista.
     setItems((prev) =>
       prev.map((i) => (i.id === item.id ? { ...i, completado: nuevo } : i)),
     );
@@ -82,16 +69,11 @@ export function ChecklistGestion({ proyectoId }: { proyectoId: string }) {
       .from("checklist_items")
       .update({ completado: nuevo })
       .eq("id", item.id)
-      .select(
-        "id, categoria, titulo, orden, completado, completado_por_nombre, completado_en",
-      )
+      .select(SELECT)
       .single();
     if (error) {
-      // Revertir en caso de fallo.
       setItems((prev) =>
-        prev.map((i) =>
-          i.id === item.id ? { ...i, completado: !nuevo } : i,
-        ),
+        prev.map((i) => (i.id === item.id ? { ...i, completado: !nuevo } : i)),
       );
       return;
     }
@@ -111,87 +93,77 @@ export function ChecklistGestion({ proyectoId }: { proyectoId: string }) {
   if (total === 0) return null;
 
   return (
-    <section className="mt-6 rounded-2xl border border-border bg-surface p-6 shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <section className="mt-6 rounded-2xl border border-border bg-surface p-5 shadow-sm sm:p-6">
+      {/* Resumen + control expandir/contraer */}
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
         <div className="flex items-center gap-2.5">
           <span className="text-lg">✅</span>
-          <h2 className="text-lg font-semibold">Checklist de gestión</h2>
+          <div>
+            <h2 className="text-lg font-semibold leading-tight">
+              Checklist de gestión
+            </h2>
+            <p className="text-sm text-muted">
+              {completos} de {total} tareas completadas
+            </p>
+          </div>
         </div>
-        <span className="text-sm text-muted">
-          {completos}/{total} completados
-        </span>
+
+        <div className="flex flex-1 items-center gap-3 sm:max-w-md">
+          <ProgressBar className="flex-1" pct={pct} />
+          <span className="w-10 shrink-0 text-right text-sm font-semibold">
+            {pct}%
+          </span>
+          <button
+            onClick={() => setAbierto((v) => !v)}
+            className="shrink-0 rounded-lg border border-border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-slate-50"
+          >
+            {abierto ? "Ocultar" : "Ver checklist"}
+          </button>
+        </div>
       </div>
 
-      <div className="mt-3 flex items-center gap-3">
-        <ProgressBar className="flex-1" pct={pct} />
-        <span className="w-10 shrink-0 text-right text-sm font-semibold">
-          {pct}%
-        </span>
-      </div>
-
-      <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-        {columnas.map((col) => {
-          const hechos = col.items.filter((i) => i.completado).length;
-          return (
-            <div
-              key={col.categoria}
-              className="flex flex-col rounded-xl border border-border bg-background/50 p-3"
-            >
-              <div className="mb-2 flex items-start justify-between gap-2">
-                <h3 className="text-sm font-semibold leading-tight">
-                  {col.categoria}
-                </h3>
-                <span className="shrink-0 text-xs text-muted">
-                  {hechos}/{col.items.length}
+      {/* Lista única, numerada, en columnas balanceadas */}
+      {abierto && (
+        <ul className="mt-5 gap-x-6 [column-gap:1.5rem] columns-1 sm:columns-2 lg:columns-4 xl:columns-5">
+          {items.map((it) => (
+            <li key={it.id} className="mb-0.5 break-inside-avoid">
+              <button
+                onClick={() => toggle(it)}
+                title={
+                  it.completado && it.completadoPorNombre
+                    ? `Completado por ${it.completadoPorNombre}${
+                        it.completadoEn
+                          ? ` · ${formatFechaHora(it.completadoEn)}`
+                          : ""
+                      }`
+                    : "Marcar como completado"
+                }
+                className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm transition-colors hover:bg-slate-100 ${
+                  it.completado ? "text-muted" : ""
+                }`}
+              >
+                <span className="w-5 shrink-0 text-right text-xs tabular-nums text-muted">
+                  {it.orden}.
                 </span>
-              </div>
-              <ul className="space-y-1">
-                {col.items.map((it) => (
-                  <li key={it.id}>
-                    <button
-                      onClick={() => toggle(it)}
-                      title={
-                        it.completado && it.completadoPorNombre
-                          ? `Completado por ${it.completadoPorNombre}${
-                              it.completadoEn
-                                ? ` · ${formatFechaHora(it.completadoEn)}`
-                                : ""
-                            }`
-                          : "Marcar como completado"
-                      }
-                      className={`flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left text-sm transition-colors hover:bg-slate-100 ${
-                        it.completado ? "text-muted" : ""
-                      }`}
-                    >
-                      <span
-                        className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[10px] ${
-                          it.completado
-                            ? "border-emerald-500 bg-emerald-500 text-white"
-                            : "border-slate-300 bg-white"
-                        }`}
-                      >
-                        {it.completado ? "✓" : ""}
-                      </span>
-                      <span
-                        className={`leading-snug ${
-                          it.completado ? "line-through" : ""
-                        }`}
-                      >
-                        {it.titulo}
-                      </span>
-                    </button>
-                    {it.completado && it.completadoPorNombre && (
-                      <p className="pl-8 text-[11px] text-muted">
-                        {it.completadoPorNombre}
-                      </p>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          );
-        })}
-      </div>
+                <span
+                  className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[10px] ${
+                    it.completado
+                      ? "border-emerald-500 bg-emerald-500 text-white"
+                      : "border-slate-300 bg-white"
+                  }`}
+                >
+                  {it.completado ? "✓" : ""}
+                </span>
+                <span
+                  className={`truncate ${it.completado ? "line-through" : ""}`}
+                >
+                  {it.titulo}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }
