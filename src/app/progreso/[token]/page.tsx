@@ -5,13 +5,16 @@ import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ProgressBar } from "@/components/ProgressBar";
 import { estadoStyles, formatFecha, formatFechaHora } from "@/lib/ui";
-import type { Estado } from "@/lib/types";
+import type { ChecklistItem, Estado } from "@/lib/types";
+import { bloques, contarHojas, estructurar, type Nodo } from "@/lib/checklist";
 
 interface Tarea {
   orden: number;
   titulo: string;
   completado: boolean;
   completadoEn: string | null;
+  esGrupo?: boolean;
+  grupo?: string | null;
 }
 interface Datos {
   proyecto: string;
@@ -67,10 +70,18 @@ export default function ProgresoPublico() {
       </Centro>
     );
 
-  const total = datos.items.length;
-  const completas = datos.items.filter((i) => i.completado).length;
-  const pendientes = total - completas;
-  const pct = total ? Math.round((completas / total) * 100) : 0;
+  const itemsCl: ChecklistItem[] = datos.items.map((t) => ({
+    id: String(t.orden),
+    categoria: "",
+    titulo: t.titulo,
+    orden: t.orden,
+    completado: t.completado,
+    esGrupo: !!t.esGrupo,
+    grupo: t.grupo,
+    completadoEn: t.completadoEn,
+  }));
+  const { total, completas, pendientes, pct } = contarHojas(itemsCl);
+  const nodos = bloques(estructurar(itemsCl));
   const badge = estadoStyles[datos.estado];
 
   return (
@@ -130,39 +141,15 @@ export default function ProgresoPublico() {
           </div>
         </div>
 
-        {/* Checklist (solo lectura) */}
+        {/* Checklist jerárquico (solo lectura) */}
         <div className="mt-5 overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
           <ul className="divide-y divide-border">
-            {datos.items.map((it) => (
-              <li
-                key={it.orden}
-                className="flex items-start gap-3 px-4 py-3 sm:px-5"
-              >
-                <span
-                  className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs ${
-                    it.completado
-                      ? "bg-emerald-100 text-emerald-600"
-                      : "bg-slate-100 text-slate-400"
-                  }`}
-                >
-                  {it.completado ? "✓" : "○"}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p
-                    className={`text-sm ${
-                      it.completado
-                        ? "text-muted line-through"
-                        : "font-medium"
-                    }`}
-                  >
-                    {it.titulo}
-                  </p>
-                  {it.completado && it.completadoEn && (
-                    <p className="mt-0.5 text-xs text-emerald-600">
-                      Completada · {formatFechaHora(it.completadoEn)}
-                    </p>
-                  )}
-                </div>
+            {nodos.map((b) => (
+              <li key={b.principal.item.id}>
+                <TareaVista nodo={b.principal} />
+                {b.subs.map((s) => (
+                  <TareaVista key={s.item.id} nodo={s} sub />
+                ))}
               </li>
             ))}
           </ul>
@@ -172,6 +159,50 @@ export default function ProgresoPublico() {
           Este avance se actualiza automáticamente conforme tu equipo avanza en
           el proyecto.
         </p>
+      </div>
+    </div>
+  );
+}
+
+// Fila de tarea de solo lectura, con sangría para subtareas y estilo de grupo.
+function TareaVista({ nodo, sub }: { nodo: Nodo; sub?: boolean }) {
+  const it = nodo.item;
+  const grupo = it.esGrupo;
+  return (
+    <div
+      className={`flex items-start gap-3 py-3 pr-4 sm:pr-5 ${
+        sub ? "pl-10 sm:pl-12" : "pl-4 sm:pl-5"
+      } ${grupo ? "bg-slate-50/60" : ""}`}
+    >
+      <span className="mt-0.5 w-7 shrink-0 text-right text-xs tabular-nums text-muted">
+        {nodo.numero}
+      </span>
+      <span
+        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs ${
+          it.completado
+            ? "bg-emerald-100 text-emerald-600"
+            : "bg-slate-100 text-slate-400"
+        }`}
+      >
+        {it.completado ? "✓" : grupo ? "•" : "○"}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p
+          className={`text-sm ${
+            grupo
+              ? `font-semibold ${it.completado ? "text-emerald-700" : "text-foreground"}`
+              : it.completado
+                ? "text-muted line-through"
+                : "font-medium"
+          }`}
+        >
+          {it.titulo}
+        </p>
+        {!grupo && it.completado && it.completadoEn && (
+          <p className="mt-0.5 text-xs text-emerald-600">
+            Completada · {formatFechaHora(it.completadoEn)}
+          </p>
+        )}
       </div>
     </div>
   );

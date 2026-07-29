@@ -1,11 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { ChecklistItem } from "@/lib/types";
 import { ProgressBar } from "./ProgressBar";
 import { CompartirAvance } from "./CompartirAvance";
 import { formatFechaHora } from "@/lib/ui";
+import {
+  bloques,
+  contarHojas,
+  estructurar,
+  recomputarGrupos,
+  type Nodo,
+} from "@/lib/checklist";
 
 interface Fila {
   id: string;
@@ -13,6 +20,8 @@ interface Fila {
   titulo: string;
   orden: number;
   completado: boolean;
+  es_grupo: boolean;
+  grupo: string | null;
   completado_por_nombre: string | null;
   completado_en: string | null;
 }
@@ -24,15 +33,17 @@ function map(f: Fila): ChecklistItem {
     titulo: f.titulo,
     orden: f.orden,
     completado: f.completado,
+    esGrupo: f.es_grupo,
+    grupo: f.grupo,
     completadoPorNombre: f.completado_por_nombre,
     completadoEn: f.completado_en,
   };
 }
 
 const SELECT =
-  "id, categoria, titulo, orden, completado, completado_por_nombre, completado_en";
+  "id, categoria, titulo, orden, completado, es_grupo, grupo, completado_por_nombre, completado_en";
 
-// Checklist operativo interno del proyecto. Módulo independiente:
+// Checklist operativo interno (jerárquico). Módulo independiente:
 // no toca onboarding, sistemas ni performance.
 export function ChecklistGestion({ proyectoId }: { proyectoId: string }) {
   const supabase = createClient();
@@ -49,7 +60,7 @@ export function ChecklistGestion({ proyectoId }: { proyectoId: string }) {
         .eq("proyecto_id", proyectoId)
         .order("orden", { ascending: true });
       if (!vivo) return;
-      setItems(((data as Fila[]) ?? []).map(map));
+      setItems(recomputarGrupos(((data as Fila[]) ?? []).map(map)));
       setCargado(true);
     })();
     return () => {
@@ -57,14 +68,19 @@ export function ChecklistGestion({ proyectoId }: { proyectoId: string }) {
     };
   }, [supabase, proyectoId]);
 
-  const total = items.length;
-  const completos = items.filter((i) => i.completado).length;
-  const pct = total ? Math.round((completos / total) * 100) : 0;
+  const { total, completas, pct } = contarHojas(items);
+  const listaBloques = useMemo(
+    () => bloques(estructurar(items)),
+    [items],
+  );
 
   async function toggle(item: ChecklistItem) {
+    if (item.esGrupo) return; // los grupos se completan solos
     const nuevo = !item.completado;
     setItems((prev) =>
-      prev.map((i) => (i.id === item.id ? { ...i, completado: nuevo } : i)),
+      recomputarGrupos(
+        prev.map((i) => (i.id === item.id ? { ...i, completado: nuevo } : i)),
+      ),
     );
     const { data, error } = await supabase
       .from("checklist_items")
@@ -74,13 +90,19 @@ export function ChecklistGestion({ proyectoId }: { proyectoId: string }) {
       .single();
     if (error) {
       setItems((prev) =>
-        prev.map((i) => (i.id === item.id ? { ...i, completado: !nuevo } : i)),
+        recomputarGrupos(
+          prev.map((i) =>
+            i.id === item.id ? { ...i, completado: !nuevo } : i,
+          ),
+        ),
       );
       return;
     }
     if (data)
       setItems((prev) =>
-        prev.map((i) => (i.id === item.id ? map(data as Fila) : i)),
+        recomputarGrupos(
+          prev.map((i) => (i.id === item.id ? map(data as Fila) : i)),
+        ),
       );
   }
 
@@ -104,7 +126,7 @@ export function ChecklistGestion({ proyectoId }: { proyectoId: string }) {
               Avance del Proyecto
             </h2>
             <p className="text-sm text-muted">
-              {completos} de {total} tareas completadas
+              {completas} de {total} tareas completadas
             </p>
           </div>
         </div>
@@ -123,51 +145,106 @@ export function ChecklistGestion({ proyectoId }: { proyectoId: string }) {
         </div>
       </div>
 
-      {/* Lista única, numerada, en columnas balanceadas */}
+      {/* Lista jerárquica en columnas (los bloques no se cortan) */}
       {abierto && (
-        <ul className="mt-5 [column-gap:1.75rem] columns-1 sm:columns-2 lg:columns-4">
-          {items.map((it) => (
-            <li key={it.id} className="mb-2 break-inside-avoid">
-              <button
-                onClick={() => toggle(it)}
-                title={
-                  it.completado && it.completadoPorNombre
-                    ? `${it.titulo} · Completado por ${it.completadoPorNombre}${
-                        it.completadoEn
-                          ? ` · ${formatFechaHora(it.completadoEn)}`
-                          : ""
-                      }`
-                    : it.titulo
-                }
-                className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm transition-colors hover:bg-slate-100 ${
-                  it.completado ? "text-muted" : ""
-                }`}
-              >
-                <span className="w-5 shrink-0 text-right text-xs tabular-nums text-muted">
-                  {it.orden}.
-                </span>
-                <span
-                  className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[10px] ${
-                    it.completado
-                      ? "border-emerald-500 bg-emerald-500 text-white"
-                      : "border-slate-300 bg-white"
-                  }`}
-                >
-                  {it.completado ? "✓" : ""}
-                </span>
-                <span
-                  className={`truncate ${it.completado ? "line-through" : ""}`}
-                >
-                  {it.titulo}
-                </span>
-              </button>
-            </li>
+        <div className="mt-5 [column-gap:2rem] columns-1 lg:columns-2">
+          {listaBloques.map((b) => (
+            <div key={b.principal.item.id} className="mb-3 break-inside-avoid">
+              {b.principal.item.esGrupo ? (
+                <CabeceraGrupo nodo={b.principal} />
+              ) : (
+                <FilaTarea
+                  nodo={b.principal}
+                  onToggle={() => toggle(b.principal.item)}
+                />
+              )}
+              {b.subs.map((s) => (
+                <FilaTarea
+                  key={s.item.id}
+                  nodo={s}
+                  sub
+                  onToggle={() => toggle(s.item)}
+                />
+              ))}
+            </div>
           ))}
-        </ul>
+        </div>
       )}
 
       {/* Compartir avance con el cliente (vista pública de solo lectura) */}
       <CompartirAvance proyectoId={proyectoId} />
     </section>
+  );
+}
+
+// Tarea marcable (principal suelta o subtarea).
+function FilaTarea({
+  nodo,
+  sub,
+  onToggle,
+}: {
+  nodo: Nodo;
+  sub?: boolean;
+  onToggle: () => void;
+}) {
+  const it = nodo.item;
+  return (
+    <button
+      onClick={onToggle}
+      title={
+        it.completado && it.completadoPorNombre
+          ? `${it.titulo} · Completado por ${it.completadoPorNombre}${
+              it.completadoEn ? ` · ${formatFechaHora(it.completadoEn)}` : ""
+            }`
+          : it.titulo
+      }
+      className={`flex w-full items-center gap-2 rounded-lg py-1.5 pr-2 text-left text-sm transition-colors hover:bg-slate-100 ${
+        sub ? "pl-8" : "pl-2"
+      } ${it.completado ? "text-muted" : ""}`}
+    >
+      <span className="w-7 shrink-0 text-right text-xs tabular-nums text-muted">
+        {nodo.numero}
+      </span>
+      <span
+        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[10px] ${
+          it.completado
+            ? "border-emerald-500 bg-emerald-500 text-white"
+            : "border-slate-300 bg-white"
+        }`}
+      >
+        {it.completado ? "✓" : ""}
+      </span>
+      <span className={`truncate ${it.completado ? "line-through" : ""}`}>
+        {it.titulo}
+      </span>
+    </button>
+  );
+}
+
+// Cabecera de grupo: no se marca a mano; refleja el roll-up de sus subtareas.
+function CabeceraGrupo({ nodo }: { nodo: Nodo }) {
+  const it = nodo.item;
+  return (
+    <div className="flex items-center gap-2 rounded-lg px-2 py-1.5">
+      <span className="w-7 shrink-0 text-right text-xs font-semibold tabular-nums text-muted">
+        {nodo.numero}
+      </span>
+      <span
+        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] ${
+          it.completado
+            ? "bg-emerald-100 text-emerald-600"
+            : "bg-slate-100 text-slate-400"
+        }`}
+      >
+        {it.completado ? "✓" : "•"}
+      </span>
+      <span
+        className={`text-sm font-semibold ${
+          it.completado ? "text-emerald-700" : "text-foreground"
+        }`}
+      >
+        {it.titulo}
+      </span>
+    </div>
   );
 }

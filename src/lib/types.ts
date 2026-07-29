@@ -52,6 +52,8 @@ export interface ChecklistItem {
   titulo: string;
   orden: number;
   completado: boolean;
+  esGrupo: boolean;
+  grupo?: string | null;
   completadoPorNombre?: string | null;
   completadoEn?: string | null;
 }
