@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { ChecklistItem } from "@/lib/types";
 import { ProgressBar } from "./ProgressBar";
+import { CompartirAvance } from "./CompartirAvance";
 import { formatFechaHora } from "@/lib/ui";
 
 interface Fila {
@@ -100,7 +101,7 @@ export function ChecklistGestion({ proyectoId }: { proyectoId: string }) {
           <span className="text-lg">✅</span>
           <div>
             <h2 className="text-lg font-semibold leading-tight">
-              Checklist de gestión
+              Avance del Proyecto
             </h2>
             <p className="text-sm text-muted">
               {completos} de {total} tareas completadas
@@ -164,6 +165,9 @@ export function ChecklistGestion({ proyectoId }: { proyectoId: string }) {
           ))}
         </ul>
       )}
+
+      {/* Compartir avance con el cliente (vista pública de solo lectura) */}
+      <CompartirAvance proyectoId={proyectoId} />
     </section>
   );
 }

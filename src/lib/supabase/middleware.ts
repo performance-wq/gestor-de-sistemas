@@ -40,7 +40,8 @@ export async function updateSession(request: NextRequest) {
   const esPublica =
     path.startsWith("/login") ||
     path.startsWith("/auth") ||
-    path.startsWith("/onboarding");
+    path.startsWith("/onboarding") ||
+    path.startsWith("/progreso");
 
   if (!user && !esPublica) {
     const url = request.nextUrl.clone();

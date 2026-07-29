@@ -8,7 +8,11 @@ import { AppHeader } from "./AppHeader";
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
-  if (pathname?.startsWith("/onboarding")) return <>{children}</>;
+  if (
+    pathname?.startsWith("/onboarding") ||
+    pathname?.startsWith("/progreso")
+  )
+    return <>{children}</>;
 
   return (
     <>
