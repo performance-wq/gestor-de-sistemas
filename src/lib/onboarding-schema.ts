@@ -93,7 +93,7 @@ export const SECCIONES: SeccionOnboarding[] = [
   },
   {
     id: "negocio",
-    titulo: "Información del Negocio",
+    titulo: "Información General del Negocio",
     descripcion: "Cuéntanos de qué se trata tu negocio.",
     preguntas: [
       { id: "neg_nombre", titulo: "¿Cuál es el nombre de tu negocio?", tipo: "texto", placeholder: "Ej. Clínica Sonrisa" },
@@ -146,7 +146,7 @@ export const SECCIONES: SeccionOnboarding[] = [
   },
   {
     id: "contenido",
-    titulo: "Contenido para Ventas",
+    titulo: "Contenido Comercial",
     descripcion: "Material que usaremos en tus automatizaciones.",
     preguntas: [
       { id: "co_faq", titulo: "Cinco preguntas frecuentes y cómo las responderías", tipo: "lista_pares", cantidad: 5 },

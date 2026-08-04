@@ -239,28 +239,34 @@ export default function OnboardingPage() {
 
   return (
     <div className="flex min-h-dvh flex-col bg-background">
-      {/* Progreso */}
-      <div className="sticky top-0 z-10 border-b border-border bg-surface/90 backdrop-blur">
-        <div className="h-1 w-full bg-slate-100">
-          <div
-            className="h-1 bg-accent transition-all duration-300"
-            style={{ width: `${pct}%` }}
-          />
+      {/* ---------- Header fijo: categoría · pregunta X de Y · progreso ---------- */}
+      <header className="sticky top-0 z-10 border-b border-border bg-surface/95 backdrop-blur">
+        <div className="mx-auto max-w-2xl px-4 py-3 sm:px-6">
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="truncate text-sm font-semibold text-accent sm:text-base">
+              {pregunta.seccionTitulo}
+            </p>
+            <p className="shrink-0 text-xs font-medium tabular-nums text-muted">
+              {guardando ? (
+                <span className="text-accent">Guardando…</span>
+              ) : (
+                `Pregunta ${paso + 1} de ${total}`
+              )}
+            </p>
+          </div>
+          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+            <div
+              className="h-full rounded-full bg-accent transition-all duration-300"
+              style={{ width: `${pct}%` }}
+            />
+          </div>
         </div>
-        <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-2.5 text-xs text-muted sm:px-6">
-          <span className="truncate font-medium">
-            {pregunta.seccionTitulo}
-          </span>
-          <span className="shrink-0 tabular-nums">
-            {guardando ? "Guardando…" : `${paso + 1} de ${total}`}
-          </span>
-        </div>
-      </div>
+      </header>
 
-      {/* Pregunta */}
+      {/* ---------- Pregunta (protagonista, centrada) ---------- */}
       <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center px-4 py-10 sm:px-6 sm:py-14">
-        <div key={pregunta.id} className="animate-[fadeIn_.25s_ease-out]">
-          <h2 className="text-xl font-semibold leading-snug sm:text-2xl">
+        <div key={pregunta.id} className="animate-[fadeIn_.25s_ease-out] text-center">
+          <h2 className="text-2xl font-semibold leading-tight tracking-tight sm:text-3xl">
             {pregunta.titulo}
             {pregunta.opcional && (
               <span className="ml-2 align-middle text-xs font-normal text-muted">
@@ -269,10 +275,12 @@ export default function OnboardingPage() {
             )}
           </h2>
           {pregunta.ayuda && (
-            <p className="mt-2 text-sm text-muted">{pregunta.ayuda}</p>
+            <p className="mx-auto mt-3 max-w-lg text-sm text-muted sm:text-base">
+              {pregunta.ayuda}
+            </p>
           )}
 
-          <div className="mt-6">
+          <div className="mt-8 text-left">
             <CampoOnboarding
               pregunta={pregunta}
               valor={respuestas[pregunta.id]}
@@ -280,9 +288,8 @@ export default function OnboardingPage() {
               token={token}
               onEnter={siguiente}
             />
+            {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
           </div>
-
-          {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
         </div>
       </div>
 
