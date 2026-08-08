@@ -9,6 +9,7 @@ import type { ArchivoSubido } from "@/lib/onboarding-schema";
 // para videos, y enlace abrir/descargar para documentos. Usa URLs firmadas.
 export function ArchivoPreview({ archivo }: { archivo: ArchivoSubido }) {
   const [url, setUrl] = useState<string | null>(null);
+  const [bajando, setBajando] = useState(false);
   const esImagen = archivo.tipo.startsWith("image/");
   const esVideo = archivo.tipo.startsWith("video/");
 
@@ -20,28 +21,48 @@ export function ArchivoPreview({ archivo }: { archivo: ArchivoSubido }) {
     };
   }, [archivo.path]);
 
+  // Descarga directa (fetch → blob), sin abrir pestaña ni salir del preview.
+  async function descargar(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!url || bajando) return;
+    setBajando(true);
+    await descargarArchivo(url, archivo.nombre);
+    setBajando(false);
+  }
+
   if (esImagen) {
     return (
-      <a
-        href={url ?? undefined}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="group relative block overflow-hidden rounded-lg border border-border bg-slate-50"
+      <div
+        className="group relative overflow-hidden rounded-lg border border-border bg-slate-50"
         title={archivo.nombre}
       >
-        {url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={url}
-            alt={archivo.nombre}
-            className="h-28 w-full object-cover transition-transform group-hover:scale-105"
-          />
-        ) : (
-          <div className="flex h-28 items-center justify-center text-xs text-muted">
-            Cargando…
-          </div>
+        <a href={url ?? undefined} target="_blank" rel="noopener noreferrer" className="block">
+          {url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={url}
+              alt={archivo.nombre}
+              className="h-28 w-full object-cover transition-transform group-hover:scale-105"
+            />
+          ) : (
+            <div className="flex h-28 items-center justify-center text-xs text-muted">
+              Cargando…
+            </div>
+          )}
+        </a>
+        {url && (
+          <button
+            onClick={descargar}
+            disabled={bajando}
+            title="Descargar imagen"
+            aria-label="Descargar imagen"
+            className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-lg bg-black/55 text-sm text-white shadow-sm backdrop-blur-sm transition-colors hover:bg-black/75 disabled:opacity-60"
+          >
+            {bajando ? "…" : "⬇"}
+          </button>
         )}
-      </a>
+      </div>
     );
   }
 
