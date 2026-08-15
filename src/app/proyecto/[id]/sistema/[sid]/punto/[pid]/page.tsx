@@ -11,6 +11,7 @@ import { descargarTexto, descargarArchivo, nombreDesdePath } from "@/lib/downloa
 import { formatFechaHora } from "@/lib/ui";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { Toast } from "@/components/Toast";
+import { VisorMedia } from "@/components/VisorMedia";
 
 export default function PuntoView() {
   const { id, sid, pid } = useParams<{ id: string; sid: string; pid: string }>();
@@ -26,6 +27,7 @@ export default function PuntoView() {
   const [copyLocal, setCopyLocal] = useState("");
   const [urlLocal, setUrlLocal] = useState("");
   const [toast, setToast] = useState<string | null>(null);
+  const [visor, setVisor] = useState<null | "imagen" | "video">(null);
   const notificar = (m: string) => setToast(m);
 
   const proyecto = getProyecto(id);
@@ -307,7 +309,9 @@ export default function PuntoView() {
                     <img
                       src={imgUrl}
                       alt={punto.nombre}
-                      className="max-h-64 w-full rounded-lg border border-border object-contain"
+                      onClick={() => setVisor("imagen")}
+                      title="Vista previa"
+                      className="max-h-64 w-full cursor-zoom-in rounded-lg border border-border object-contain"
                     />
                   ) : (
                     <div className="flex h-32 items-center justify-center rounded-lg border border-border text-sm text-muted">
@@ -315,6 +319,13 @@ export default function PuntoView() {
                     </div>
                   )}
                   <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setVisor("imagen")}
+                      disabled={!imgUrl}
+                      className={btnSec}
+                    >
+                      👁 Vista previa
+                    </button>
                     <button
                       onClick={() =>
                         imgUrl && descargarArchivo(imgUrl, nombreDesdePath(imagen))
@@ -400,6 +411,13 @@ export default function PuntoView() {
                     </a>
                   )}
                   <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setVisor("video")}
+                      disabled={videoEsArchivo && !videoUrl}
+                      className={btnSec}
+                    >
+                      👁 Vista previa
+                    </button>
                     {videoEsArchivo && (
                       <button
                         onClick={() =>
@@ -469,6 +487,46 @@ export default function PuntoView() {
           </div>
         )}
       </div>
+
+      {/* Visor grande (imagen con zoom / video), aditivo */}
+      {visor === "imagen" && imagen && (
+        <VisorMedia
+          abierto
+          onClose={() => setVisor(null)}
+          titulo={punto.nombre}
+          copy={copyLocal}
+          tipo="imagen"
+          url={imgUrl}
+          onDescargar={
+            imgUrl
+              ? () => descargarArchivo(imgUrl, nombreDesdePath(imagen))
+              : undefined
+          }
+        />
+      )}
+      {visor === "video" && video && (
+        <VisorMedia
+          abierto
+          onClose={() => setVisor(null)}
+          titulo={punto.nombre}
+          copy={copyLocal}
+          tipo={
+            videoEsArchivo
+              ? "video-archivo"
+              : embed
+                ? "video-embed"
+                : "video-link"
+          }
+          url={videoUrl}
+          embed={embed}
+          link={video}
+          onDescargar={
+            videoEsArchivo && videoUrl
+              ? () => descargarArchivo(videoUrl, nombreDesdePath(video))
+              : undefined
+          }
+        />
+      )}
 
       {toast && <Toast mensaje={toast} onClose={() => setToast(null)} />}
     </div>
