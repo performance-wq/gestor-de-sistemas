@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/store";
 import { proyectoStats } from "@/lib/progress";
 import { ESTADOS, NICHOS, estadoStyles, formatFecha } from "@/lib/ui";
+import { listarNichos } from "@/lib/nichos";
 import type { Estado } from "@/lib/types";
 import { EstadoBadge } from "@/components/EstadoBadge";
 import { ProgressBar } from "@/components/ProgressBar";
@@ -17,7 +18,12 @@ export default function Dashboard() {
   const [busqueda, setBusqueda] = useState("");
   const [fEstado, setFEstado] = useState<FiltroEstado>("Todos");
   const [fNicho, setFNicho] = useState<string>("Todos");
+  const [nichos, setNichos] = useState<string[]>([...NICHOS]);
   const [modal, setModal] = useState(false);
+
+  useEffect(() => {
+    listarNichos().then(setNichos);
+  }, [modal]);
 
   const visibles = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
@@ -93,7 +99,7 @@ export default function Dashboard() {
           className="rounded-full border border-border bg-surface px-3 py-1.5 text-sm font-medium text-muted outline-none focus:border-accent focus:text-foreground"
         >
           <option value="Todos">Todos los nichos</option>
-          {NICHOS.map((n) => (
+          {nichos.map((n) => (
             <option key={n}>{n}</option>
           ))}
         </select>

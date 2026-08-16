@@ -1,10 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { ESTADOS, NICHOS } from "@/lib/ui";
+import { listarNichos, agregarNicho } from "@/lib/nichos";
 import type { Estado } from "@/lib/types";
+
+const AGREGAR = "__agregar__";
 
 export function NuevoProyectoModal({ onClose }: { onClose: () => void }) {
   const { crearProyecto } = useStore();
@@ -12,12 +15,32 @@ export function NuevoProyectoModal({ onClose }: { onClose: () => void }) {
   const [nombre, setNombre] = useState("");
   const [cliente, setCliente] = useState("");
   const [nicho, setNicho] = useState<string>("");
+  const [nichos, setNichos] = useState<string[]>([...NICHOS]);
+  const [nuevoNicho, setNuevoNicho] = useState("");
+  const [agregandoNicho, setAgregandoNicho] = useState(false);
   const [estado, setEstado] = useState<Estado>("Pendiente");
   const [fechaIncorporacion, setFecha] = useState(
     new Date().toISOString().slice(0, 10),
   );
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    listarNichos().then(setNichos);
+  }, []);
+
+  async function guardarNuevoNicho() {
+    const canon = await agregarNicho(nuevoNicho, nichos);
+    if (!canon) return;
+    setNichos((prev) =>
+      prev.some((n) => n.toLowerCase() === canon.toLowerCase())
+        ? prev
+        : [...prev, canon],
+    );
+    setNicho(canon);
+    setNuevoNicho("");
+    setAgregandoNicho(false);
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -83,16 +106,50 @@ export function NuevoProyectoModal({ onClose }: { onClose: () => void }) {
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium">Nicho</label>
-              <select
-                value={nicho}
-                onChange={(e) => setNicho(e.target.value)}
-                className={inputCls}
-              >
-                <option value="">—</option>
-                {NICHOS.map((n) => (
-                  <option key={n}>{n}</option>
-                ))}
-              </select>
+              {agregandoNicho ? (
+                <div className="flex gap-2">
+                  <input
+                    autoFocus
+                    value={nuevoNicho}
+                    onChange={(e) => setNuevoNicho(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        guardarNuevoNicho();
+                      }
+                      if (e.key === "Escape") setAgregandoNicho(false);
+                    }}
+                    placeholder="Nuevo nicho…"
+                    className={inputCls}
+                  />
+                  <button
+                    type="button"
+                    onClick={guardarNuevoNicho}
+                    disabled={!nuevoNicho.trim()}
+                    className="shrink-0 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+                  >
+                    Guardar
+                  </button>
+                </div>
+              ) : (
+                <select
+                  value={nicho}
+                  onChange={(e) => {
+                    if (e.target.value === AGREGAR) {
+                      setAgregandoNicho(true);
+                      return;
+                    }
+                    setNicho(e.target.value);
+                  }}
+                  className={inputCls}
+                >
+                  <option value="">—</option>
+                  {nichos.map((n) => (
+                    <option key={n}>{n}</option>
+                  ))}
+                  <option value={AGREGAR}>+ Agregar nuevo nicho…</option>
+                </select>
+              )}
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
