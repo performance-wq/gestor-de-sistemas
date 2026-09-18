@@ -176,7 +176,7 @@ export default function OnboardingPage() {
             ? "Recibimos toda tu información correctamente. Nuestro equipo la revisará y avanzará con la implementación de tu sistema."
             : "Ya recibimos tus respuestas. Si necesitas cambiar algo, escríbele a tu equipo de implementación."}
         </p>
-        <p className="mt-6 text-xs text-muted">Systems PEX</p>
+        <p className="mt-6 text-xs text-muted">LexBrain</p>
       </Centro>
     );
 
@@ -186,24 +186,24 @@ export default function OnboardingPage() {
       <div className="flex min-h-dvh items-center justify-center px-5 py-12">
         <div className="w-full max-w-xl animate-[fadeIn_.35s_ease-out]">
           <div className="flex items-center gap-2.5">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-sm font-bold text-white">
-              S
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-foreground text-sm font-bold text-accent">
+              L
             </span>
-            <span className="text-sm font-semibold tracking-tight">
-              Systems PEX
+            <span className="text-sm font-semibold tracking-[0.2em]">
+              LEXBRAIN
             </span>
           </div>
 
           <h1 className="mt-8 text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
-            ¡Bienvenido a Systems PEX! <span className="inline-block">👋</span>
+            Bienvenido a LexBrain <span className="inline-block">👋</span>
           </h1>
 
           <p className="mt-5 text-lg text-muted">Gracias por confiar en nosotros.</p>
 
           <p className="mt-4 leading-relaxed text-muted">
             Este formulario nos permitirá recopilar toda la información
-            necesaria para configurar tu CRM, automatizaciones, inteligencia
-            artificial y demás sistemas de manera personalizada.
+            necesaria para configurar correctamente tu CRM, automatizaciones,
+            inteligencia artificial y los sistemas de tu empresa.
           </p>
           <p className="mt-3 leading-relaxed text-muted">
             La información que compartas nos ayudará a implementar tu proyecto
@@ -211,7 +211,7 @@ export default function OnboardingPage() {
           </p>
 
           <div className="mt-7 space-y-2.5 rounded-xl border border-border bg-surface p-4">
-            <Dato icono="⏱️" texto="Tiempo estimado: 10 a 15 minutos." />
+            <Dato icono="⏱️" texto="Tiempo estimado: 30 minutos." />
             <Dato icono="📱" texto="Puedes completarlo desde cualquier dispositivo." />
             <Dato
               icono="💾"
@@ -249,7 +249,7 @@ export default function OnboardingPage() {
       <header className="sticky top-0 z-10 border-b border-border bg-surface/95 backdrop-blur">
         <div className="mx-auto max-w-2xl px-4 py-3 sm:px-6">
           <div className="flex items-baseline justify-between gap-3">
-            <p className="truncate text-sm font-semibold text-accent sm:text-base">
+            <p className="truncate text-sm font-semibold text-foreground sm:text-base">
               {pregunta.seccionTitulo}
             </p>
             <p className="shrink-0 text-xs font-medium tabular-nums text-muted">

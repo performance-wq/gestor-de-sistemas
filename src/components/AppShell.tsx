@@ -8,11 +8,12 @@ import { AppHeader } from "./AppHeader";
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
-  if (
-    pathname?.startsWith("/onboarding") ||
-    pathname?.startsWith("/progreso")
-  )
-    return <>{children}</>;
+  // Onboarding (V1 y V2): identidad visual LexBrain (dorado sobre blanco),
+  // acotada a esta ruta mediante la clase de tema.
+  if (pathname?.startsWith("/onboarding"))
+    return <div className="onb-lexbrain">{children}</div>;
+
+  if (pathname?.startsWith("/progreso")) return <>{children}</>;
 
   return (
     <>

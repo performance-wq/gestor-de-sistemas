@@ -46,3 +46,17 @@ body {
     transform: translateY(0);
   }
 }
+
+/* ---------------------------------------------------------------
+   Identidad LexBrain — SOLO para los formularios de onboarding.
+   Redefine el acento a dorado (botones, barra de progreso, focos,
+   indicadores). El negro y el fondo blanco se mantienen. Acotado
+   por la clase .onb-lexbrain que envuelve la ruta /onboarding.
+   --------------------------------------------------------------- */
+.onb-lexbrain {
+  --accent: #c19a3e; /* dorado premium */
+}
+/* Texto oscuro sobre los botones/áreas doradas para máxima legibilidad. */
+.onb-lexbrain .bg-accent {
+  color: #111827;
+}
