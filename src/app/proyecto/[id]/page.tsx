@@ -171,11 +171,20 @@ export default function ProyectoView() {
       {/* ---------- Contenido de la fase ---------- */}
       <div className="mt-6">
         {fase === "onboarding" && (
-          <OnboardingPanel
-            proyectoId={proyecto.id}
-            proyectoNombre={proyecto.nombre}
-            cliente={proyecto.cliente}
-          />
+          <div className="space-y-6">
+            <OnboardingPanel
+              proyectoId={proyecto.id}
+              proyectoNombre={proyecto.nombre}
+              cliente={proyecto.cliente}
+              version={1}
+            />
+            <OnboardingPanel
+              proyectoId={proyecto.id}
+              proyectoNombre={proyecto.nombre}
+              cliente={proyecto.cliente}
+              version={2}
+            />
+          </div>
         )}
 
         {fase === "implementacion" && (

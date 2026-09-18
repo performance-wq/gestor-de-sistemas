@@ -11,6 +11,7 @@ import type { Respuestas } from "@/lib/onboarding-schema";
 import { formatFechaHora } from "@/lib/ui";
 
 interface OnbRow {
+  id: string;
   token: string;
   estado: "pendiente" | "completado";
   respuestas: Respuestas;
@@ -21,10 +22,12 @@ export function OnboardingPanel({
   proyectoId,
   proyectoNombre,
   cliente,
+  version = 1,
 }: {
   proyectoId: string;
   proyectoNombre: string;
   cliente?: string;
+  version?: number;
 }) {
   const supabase = createClient();
   const [row, setRow] = useState<OnbRow | null>(null);
@@ -38,12 +41,13 @@ export function OnboardingPanel({
   const cargar = useCallback(async () => {
     const { data } = await supabase
       .from("onboarding")
-      .select("token, estado, respuestas, enviado_en")
+      .select("id, token, estado, respuestas, enviado_en")
       .eq("proyecto_id", proyectoId)
+      .eq("version", version)
       .maybeSingle();
     setRow(data as OnbRow | null);
     setCargando(false);
-  }, [supabase, proyectoId]);
+  }, [supabase, proyectoId, version]);
 
   useEffect(() => {
     cargar();
@@ -53,6 +57,7 @@ export function OnboardingPanel({
     setGenerando(true);
     const { data, error } = await supabase.rpc("onboarding_asegurar", {
       p_proyecto: proyectoId,
+      p_version: version,
     });
     setGenerando(false);
     if (error || !data) {
@@ -84,6 +89,7 @@ export function OnboardingPanel({
       cliente,
       row.respuestas ?? {},
       (h, t) => setDescargando(t ? `Descargando archivos ${h}/${t}…` : null),
+      version,
     );
     setDescargando(null);
     setToast(
@@ -101,7 +107,12 @@ export function OnboardingPanel({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <span className="text-lg">📋</span>
-          <h2 className="text-lg font-semibold">Formulario de onboarding</h2>
+          <h2 className="text-lg font-semibold">
+            Formulario de onboarding
+          </h2>
+          <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
+            {version === 2 ? "V2 · Ágil" : "V1"}
+          </span>
           {row && (
             <span
               className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
@@ -218,7 +229,12 @@ export function OnboardingPanel({
           </button>
         }
       >
-        {row && <OnboardingRespuestas respuestas={row.respuestas ?? {}} />}
+        {row && (
+          <OnboardingRespuestas
+            respuestas={row.respuestas ?? {}}
+            version={version}
+          />
+        )}
       </Modal>
 
       {/* Administración: historial + reinicio seguro */}
@@ -231,6 +247,8 @@ export function OnboardingPanel({
           cliente={cliente}
           estado={row.estado}
           respuestas={row.respuestas ?? {}}
+          version={version}
+          onboardingId={row.id}
           onReiniciado={cargar}
           onAviso={setToast}
         />

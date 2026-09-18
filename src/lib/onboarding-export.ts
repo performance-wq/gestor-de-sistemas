@@ -3,12 +3,13 @@
 // El documento incluye todo el texto, los enlaces y referencias a los archivos.
 
 import {
-  SECCIONES,
+  seccionesDe,
   esTipoArchivo,
   type ArchivoSubido,
   type Par,
   type Pregunta,
   type Respuestas,
+  type SeccionOnboarding,
 } from "./onboarding-schema";
 import { urlFirmada } from "./storage";
 import { crearZip } from "./zip";
@@ -60,6 +61,7 @@ export function construirMarkdown(
   cliente: string | undefined,
   respuestas: Respuestas,
   rutas: Map<string, string>,
+  secciones: SeccionOnboarding[],
 ): string {
   const l: string[] = [];
   l.push(`# Onboarding — ${proyecto}`);
@@ -67,7 +69,7 @@ export function construirMarkdown(
   l.push(`\n**Exportado:** ${new Date().toLocaleString("es")}`);
   l.push("\n---");
 
-  for (const sec of SECCIONES) {
+  for (const sec of secciones) {
     l.push(`\n## ${sec.titulo}`);
     for (const p of sec.preguntas) {
       const v = respuestas[p.id];
@@ -100,10 +102,12 @@ export async function descargarOnboardingZip(
   cliente: string | undefined,
   respuestas: Respuestas,
   onProgreso?: (hechos: number, total: number) => void,
+  version = 1,
 ): Promise<{ ok: boolean; fallidos: number }> {
+  const secciones = seccionesDe(version);
   // 1) Recolectar todos los archivos referenciados.
   const archivos: { pregunta: Pregunta; a: ArchivoSubido }[] = [];
-  for (const sec of SECCIONES) {
+  for (const sec of secciones) {
     for (const p of sec.preguntas) {
       if (!esTipoArchivo(p.tipo)) continue;
       const v = respuestas[p.id];
@@ -148,7 +152,7 @@ export async function descargarOnboardingZip(
   }
 
   // 3) Documento con todas las respuestas + referencias a los archivos.
-  const md = construirMarkdown(proyecto, cliente, respuestas, rutas);
+  const md = construirMarkdown(proyecto, cliente, respuestas, rutas, secciones);
   entradas.unshift({
     nombre: "respuestas.md",
     datos: new TextEncoder().encode(md),

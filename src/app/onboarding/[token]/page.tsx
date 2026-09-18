@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { CampoOnboarding } from "@/components/CampoOnboarding";
 import {
-  PREGUNTAS_PLANAS,
+  preguntasPlanasDe,
   validar,
   type Respuesta,
   type Respuestas,
@@ -24,9 +24,11 @@ export default function OnboardingPage() {
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [enviando, setEnviando] = useState(false);
+  const [version, setVersion] = useState(1);
 
-  const total = PREGUNTAS_PLANAS.length;
-  const pregunta = PREGUNTAS_PLANAS[paso];
+  const preguntas = preguntasPlanasDe(version);
+  const total = preguntas.length;
+  const pregunta = preguntas[paso];
   const respuestasRef = useRef<Respuestas>({});
   const sucioRef = useRef(false);
 
@@ -44,7 +46,10 @@ export default function OnboardingPage() {
         proyecto: string;
         estado: string;
         respuestas: Respuestas;
+        version?: number;
       };
+      const ver = d.version ?? 1;
+      setVersion(ver);
       setProyecto(d.proyecto ?? "");
       const guardadas = d.respuestas ?? {};
       setRespuestas(guardadas);
@@ -54,13 +59,14 @@ export default function OnboardingPage() {
         return;
       }
       // Retomar donde quedó.
-      const pendiente = PREGUNTAS_PLANAS.findIndex(
+      const plano = preguntasPlanasDe(ver);
+      const pendiente = plano.findIndex(
         (p) => validar(p, guardadas[p.id]) !== null,
       );
-      setPaso(pendiente < 0 ? total - 1 : pendiente);
+      setPaso(pendiente < 0 ? plano.length - 1 : pendiente);
       setFase("intro");
     })();
-  }, [supabase, token, total]);
+  }, [supabase, token]);
 
   // ---------- Autoguardado ----------
   const guardar = useCallback(async () => {
@@ -119,7 +125,7 @@ export default function OnboardingPage() {
 
   async function enviar() {
     // Revisión final de todo el formulario.
-    const faltante = PREGUNTAS_PLANAS.findIndex(
+    const faltante = preguntas.findIndex(
       (p) => validar(p, respuestas[p.id]) !== null,
     );
     if (faltante >= 0) {

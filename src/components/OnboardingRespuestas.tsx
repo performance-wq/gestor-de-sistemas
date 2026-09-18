@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ArchivoPreview } from "./ArchivoPreview";
 import {
-  SECCIONES,
+  seccionesDe,
   esTipoArchivo,
   type ArchivoSubido,
   type Par,
@@ -22,14 +22,17 @@ export function tieneValor(v: unknown): boolean {
 // cada una expandible/contraíble. Reutilizado en la vista previa (modal).
 export function OnboardingRespuestas({
   respuestas,
+  version = 1,
 }: {
   respuestas: Respuestas;
+  version?: number;
 }) {
-  const [abierto, setAbierto] = useState<string | null>(SECCIONES[0].id);
+  const secciones = seccionesDe(version);
+  const [abierto, setAbierto] = useState<string | null>(secciones[0].id);
 
   return (
     <div className="space-y-2.5">
-      {SECCIONES.map((sec) => {
+      {secciones.map((sec) => {
         const respondidas = sec.preguntas.filter((p) =>
           tieneValor(respuestas[p.id]),
         ).length;

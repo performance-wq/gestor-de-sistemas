@@ -28,6 +28,8 @@ export function OnboardingAdmin({
   cliente,
   estado,
   respuestas,
+  version = 1,
+  onboardingId,
   onReiniciado,
   onAviso,
 }: {
@@ -38,6 +40,8 @@ export function OnboardingAdmin({
   cliente?: string;
   estado: "pendiente" | "completado";
   respuestas: Respuestas;
+  version?: number;
+  onboardingId: string;
   onReiniciado: () => void;
   onAviso: (m: string) => void;
 }) {
@@ -55,11 +59,11 @@ export function OnboardingAdmin({
       .select(
         "id, version, respuestas, estado, enviado_en, archivado_en, archivado_por_nombre",
       )
-      .eq("proyecto_id", proyectoId)
+      .eq("onboarding_id", onboardingId)
       .order("version", { ascending: false });
     setVersiones((data as Version[]) ?? []);
     setCargando(false);
-  }, [supabase, proyectoId]);
+  }, [supabase, onboardingId]);
 
   useEffect(() => {
     if (abierto) {
@@ -76,6 +80,7 @@ export function OnboardingAdmin({
     setReiniciando(true);
     const { data, error } = await supabase.rpc("onboarding_reiniciar", {
       p_proyecto: proyectoId,
+      p_version: version,
     });
     setReiniciando(false);
     if (error) {
@@ -168,6 +173,8 @@ export function OnboardingAdmin({
                         `${proyectoNombre} (v${v.version})`,
                         cliente,
                         v.respuestas ?? {},
+                        undefined,
+                        version,
                       );
                       onAviso("ZIP descargado");
                     }}
@@ -229,7 +236,10 @@ export function OnboardingAdmin({
         }
       >
         {verVersion && (
-          <OnboardingRespuestas respuestas={verVersion.respuestas ?? {}} />
+          <OnboardingRespuestas
+            respuestas={verVersion.respuestas ?? {}}
+            version={version}
+          />
         )}
       </Modal>
     </>

@@ -180,7 +180,7 @@ export function CampoOnboarding({
   // ---------- Archivos ----------
   if (esTipoArchivo(pregunta.tipo)) {
     const archivos = (valor as ArchivoSubido[]) ?? [];
-    const limite = pregunta.cantidad ?? 10;
+    const limite = pregunta.cantidad ?? pregunta.maximo ?? 10;
     const lleno = archivos.length >= limite;
 
     async function onFiles(lista: FileList | null) {
@@ -250,7 +250,9 @@ export function CampoOnboarding({
             {etiquetaTipo(pregunta)} · máximo {MAX_MB} MB por archivo
             {pregunta.cantidad
               ? ` · ${archivos.length} de ${pregunta.cantidad}`
-              : ""}
+              : pregunta.maximo
+                ? ` · ${archivos.length} de ${pregunta.maximo} (máx)`
+                : ""}
           </span>
         </label>
 

@@ -27,6 +27,8 @@ export interface Pregunta {
   opcional?: boolean;
   /** Cantidad EXACTA requerida (archivos o ítems de lista). */
   cantidad?: number;
+  /** Máximo permitido de archivos (tope, sin exigir una cantidad exacta). */
+  maximo?: number;
   placeholder?: string;
 }
 
@@ -165,6 +167,98 @@ export const PREGUNTAS_PLANAS = SECCIONES.flatMap((s) =>
   s.preguntas.map((p) => ({ ...p, seccionId: s.id, seccionTitulo: s.titulo })),
 );
 
+// =============================================================
+// Onboarding V2 — formulario más ágil (misma infraestructura).
+// IDs con prefijo v2_ para no colisionar con V1.
+// =============================================================
+export const SECCIONES_V2: SeccionOnboarding[] = [
+  {
+    id: "v2_personal",
+    titulo: "Información Personal",
+    descripcion: "Para saber con quién estamos trabajando.",
+    preguntas: [
+      { id: "v2_nombre", titulo: "¿Cuál es tu nombre completo?", tipo: "texto", placeholder: "Ej. María González Pérez" },
+      { id: "v2_email", titulo: "¿Cuál es tu correo electrónico?", tipo: "email", placeholder: "tucorreo@empresa.com" },
+      { id: "v2_whatsapp", titulo: "¿Cuál es tu teléfono / WhatsApp?", tipo: "tel", ayuda: "Incluye el código de país.", placeholder: "+52 55 1234 5678" },
+    ],
+  },
+  {
+    id: "v2_negocio",
+    titulo: "Información del Negocio",
+    descripcion: "Los datos básicos de tu negocio.",
+    preguntas: [
+      { id: "v2_neg_nombre", titulo: "¿Cuál es el nombre de tu negocio?", tipo: "texto", placeholder: "Ej. Clínica Sonrisa" },
+      { id: "v2_neg_direccion", titulo: "¿Cuál es la dirección física?", tipo: "texto" },
+      { id: "v2_neg_maps", titulo: "Link de Google Maps", tipo: "url", opcional: true, placeholder: "https://maps.google.com/…" },
+      { id: "v2_neg_horario", titulo: "¿Cuál es tu horario de atención?", tipo: "textarea" },
+      { id: "v2_neg_telefono", titulo: "Teléfono de contacto", tipo: "tel" },
+      { id: "v2_neg_whatsapp", titulo: "WhatsApp", tipo: "tel" },
+    ],
+  },
+  {
+    id: "v2_comercial",
+    titulo: "Configuración Comercial",
+    descripcion: "Información estratégica para configurar la atención comercial.",
+    preguntas: [
+      {
+        id: "v2_obj_ia",
+        titulo: "¿Cuál es el objetivo principal de la IA durante la atención de prospectos?",
+        tipo: "textarea",
+        ayuda: "Por ejemplo: brindar información, agendar citas, derivar con un asesor o calificar prospectos. Puedes elegir uno, combinar varios o describirlo con tus palabras.",
+      },
+      {
+        id: "v2_post_compra",
+        titulo: "¿Qué sucede después de que un cliente compra o realiza una reserva?",
+        tipo: "textarea",
+        ayuda: "Nos ayudará a configurar los flujos de seguimiento y automatización.",
+      },
+    ],
+  },
+  {
+    id: "v2_recojo",
+    titulo: "Recojo de Información",
+    descripcion: "Comparte todo lo necesario para configurar correctamente la IA.",
+    preguntas: [
+      {
+        id: "v2_prompt_maestro",
+        titulo: "Prompt Maestro",
+        tipo: "textarea",
+        ayuda: "Puedes pegar un prompt muy extenso. No hay límite de longitud.",
+      },
+      {
+        id: "v2_info_adicional",
+        titulo: "Información Adicional",
+        tipo: "textarea",
+        opcional: true,
+        ayuda: "Cualquier información complementaria sobre tu negocio. Sin límite de longitud.",
+      },
+    ],
+  },
+  {
+    id: "v2_contenido",
+    titulo: "Contenido Comercial",
+    descripcion:
+      "Comparte el mejor contenido disponible de tu negocio. Puedes incluir testimonios, casos de éxito, antes y después, recorrido por el negocio, productos, servicios, instalaciones, cómo llegar o cualquier material que represente bien tu operación.",
+    preguntas: [
+      { id: "v2_imagenes", titulo: "Sube hasta 5 imágenes de tu negocio", tipo: "imagenes", maximo: 5, ayuda: "El mejor material disponible: testimonios, productos, instalaciones, antes y después, etc." },
+      { id: "v2_videos", titulo: "Sube hasta 5 videos de tu negocio", tipo: "videos", maximo: 5, opcional: true, ayuda: "Testimonios, casos de éxito, recorrido por el negocio, etc." },
+      { id: "v2_logo", titulo: "Sube el logo de tu negocio", tipo: "imagenes", cantidad: 1 },
+    ],
+  },
+];
+
+/** Secciones del formulario según la versión (1 = original, 2 = ágil). */
+export function seccionesDe(version?: number): SeccionOnboarding[] {
+  return version === 2 ? SECCIONES_V2 : SECCIONES;
+}
+
+/** Preguntas planas (con su sección) según la versión. */
+export function preguntasPlanasDe(version?: number) {
+  return seccionesDe(version).flatMap((s) =>
+    s.preguntas.map((p) => ({ ...p, seccionId: s.id, seccionTitulo: s.titulo })),
+  );
+}
+
 /** Valida una respuesta. Devuelve null si es válida, o el mensaje de error. */
 export function validar(p: Pregunta, valor: Respuesta): string | null {
   const vacio =
@@ -193,10 +287,14 @@ export function validar(p: Pregunta, valor: Respuesta): string | null {
     if (arr.length < p.cantidad)
       return `Completa las ${p.cantidad} preguntas con su respuesta (llevas ${arr.length}).`;
   }
-  if (esTipoArchivo(p.tipo) && p.cantidad) {
-    const arr = valor as ArchivoSubido[];
-    if (arr.length !== p.cantidad)
-      return `Debes subir exactamente ${p.cantidad} archivo${p.cantidad === 1 ? "" : "s"} (llevas ${arr.length}).`;
+  if (esTipoArchivo(p.tipo)) {
+    const arr = (valor as ArchivoSubido[]) ?? [];
+    if (p.cantidad) {
+      if (arr.length !== p.cantidad)
+        return `Debes subir exactamente ${p.cantidad} archivo${p.cantidad === 1 ? "" : "s"} (llevas ${arr.length}).`;
+    } else if (p.maximo && arr.length > p.maximo) {
+      return `Puedes subir hasta ${p.maximo} archivos (llevas ${arr.length}).`;
+    }
   }
   return null;
 }
