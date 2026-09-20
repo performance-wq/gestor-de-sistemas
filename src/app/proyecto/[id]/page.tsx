@@ -12,13 +12,22 @@ import { Breadcrumb } from "@/components/Breadcrumb";
 import { DatosControl } from "@/components/DatosControl";
 import { OnboardingPanel } from "@/components/OnboardingPanel";
 import { ChecklistGestion } from "@/components/ChecklistGestion";
+import { SeguimientoProyecto } from "@/components/SeguimientoProyecto";
+import { HistorialProyecto } from "@/components/HistorialProyecto";
 
-type Fase = "onboarding" | "implementacion" | "performance";
+type Fase =
+  | "onboarding"
+  | "implementacion"
+  | "seguimiento"
+  | "resultados"
+  | "historial";
 
 const FASES: { id: Fase; n: number; label: string; hint: string }[] = [
   { id: "onboarding", n: 1, label: "Onboarding", hint: "Información del cliente" },
   { id: "implementacion", n: 2, label: "Implementación", hint: "Sistemas" },
-  { id: "performance", n: 3, label: "Performance", hint: "Resultados" },
+  { id: "seguimiento", n: 3, label: "Seguimiento", hint: "Tareas" },
+  { id: "resultados", n: 4, label: "Resultados", hint: "Performance" },
+  { id: "historial", n: 5, label: "Historial", hint: "Actividad" },
 ];
 
 export default function ProyectoView() {
@@ -250,9 +259,13 @@ export default function ProyectoView() {
           </div>
         )}
 
-        {fase === "performance" && (
+        {fase === "seguimiento" && (
+          <SeguimientoProyecto proyectoId={proyecto.id} />
+        )}
+
+        {fase === "resultados" && (
           <div>
-            <h2 className="text-lg font-semibold">Performance</h2>
+            <h2 className="text-lg font-semibold">Resultados</h2>
             <p className="mt-0.5 text-sm text-muted">
               Medimos el impacto del proyecto tras la implementación.
             </p>
@@ -260,6 +273,10 @@ export default function ProyectoView() {
               <DatosControl proyecto={proyecto} />
             </div>
           </div>
+        )}
+
+        {fase === "historial" && (
+          <HistorialProyecto proyectoId={proyecto.id} />
         )}
       </div>
     </div>

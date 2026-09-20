@@ -245,6 +245,35 @@ export async function listarHistorial(taskId: string): Promise<TareaHistorial[]>
   }));
 }
 
+// Historial agregado de todas las tareas de un proyecto (timeline del proyecto).
+export async function listarHistorialProyecto(
+  proyectoId: string,
+): Promise<(TareaHistorial & { tareaTitulo: string })[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("task_history")
+    .select("*, tasks!inner(proyecto_id, titulo)")
+    .eq("tasks.proyecto_id", proyectoId)
+    .order("created_at", { ascending: false })
+    .limit(200);
+  if (error) {
+    console.error("Error listando historial del proyecto:", error.message);
+    return [];
+  }
+  return (data ?? []).map((r: Row) => ({
+    id: r.id as string,
+    taskId: r.task_id as string,
+    actorId: (r.actor_id as string) ?? null,
+    accion: r.accion as string,
+    campo: (r.campo as string) ?? null,
+    valorAnterior: (r.valor_anterior as string) ?? null,
+    valorNuevo: (r.valor_nuevo as string) ?? null,
+    nota: (r.nota as string) ?? null,
+    createdAt: (r.created_at as string) ?? "",
+    tareaTitulo: ((r.tasks as Row)?.titulo as string) ?? "—",
+  }));
+}
+
 export async function listarComentarios(taskId: string): Promise<TareaComentario[]> {
   const supabase = createClient();
   const { data, error } = await supabase
