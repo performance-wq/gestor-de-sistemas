@@ -65,7 +65,8 @@ export async function POST(request: NextRequest) {
   const email = (body.email ?? "").trim().toLowerCase();
   const nombre = (body.nombre ?? "").trim();
   const password = body.password ?? "";
-  const rol = body.rol === "admin" ? "admin" : "subcuenta";
+  const ROLES_VALIDOS = ["admin", "subcuenta", "pm", "coordinacion", "implementacion"];
+  const rol = ROLES_VALIDOS.includes(body.rol ?? "") ? body.rol! : "subcuenta";
 
   if (!email || password.length < 8)
     return NextResponse.json(

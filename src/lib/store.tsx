@@ -18,7 +18,12 @@ import {
 import type { Estado, Proyecto, Sistema, Punto } from "./types";
 import { createClient } from "./supabase/client";
 
-export type Rol = "admin" | "subcuenta";
+export type Rol =
+  | "admin"
+  | "subcuenta"
+  | "pm"
+  | "coordinacion"
+  | "implementacion";
 
 interface Usuario {
   id: string;

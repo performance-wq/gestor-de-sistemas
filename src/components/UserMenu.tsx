@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { createClient } from "@/lib/supabase/client";
+import { etiquetaRol } from "@/lib/roles";
 
 export function UserMenu() {
   const { usuario } = useStore();
@@ -39,7 +40,7 @@ export function UserMenu() {
       )}
       <div className="hidden text-right sm:block">
         <div className="text-sm font-medium leading-tight">{usuario.nombre}</div>
-        <div className="text-xs capitalize text-muted">{usuario.rol}</div>
+        <div className="text-xs text-muted">{etiquetaRol(usuario.rol)}</div>
       </div>
       <span className="flex h-8 w-8 items-center justify-center rounded-full bg-accent/10 text-xs font-semibold text-accent">
         {inicial}

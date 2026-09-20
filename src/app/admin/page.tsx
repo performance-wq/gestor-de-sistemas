@@ -6,12 +6,13 @@ import { useStore } from "@/lib/store";
 import { createClient } from "@/lib/supabase/client";
 import { formatFecha, formatFechaHora } from "@/lib/ui";
 import { Breadcrumb } from "@/components/Breadcrumb";
+import { ROLES, accesoPorAsignacion } from "@/lib/roles";
 
 interface Perfil {
   id: string;
   email: string;
   nombre: string;
-  rol: "admin" | "subcuenta";
+  rol: string;
   activo: boolean;
   created_at: string;
   ultimo_acceso?: string | null;
@@ -30,7 +31,7 @@ export default function AdminPage() {
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [rol, setRol] = useState<"admin" | "subcuenta">("subcuenta");
+  const [rol, setRol] = useState<string>("implementacion");
   const [creando, setCreando] = useState(false);
   const [msg, setMsg] = useState<{ tipo: "ok" | "err"; texto: string } | null>(
     null,
@@ -100,7 +101,7 @@ export default function AdminPage() {
         setNombre("");
         setEmail("");
         setPassword("");
-        setRol("subcuenta");
+        setRol("implementacion");
         await cargar();
       }
     } catch {
@@ -120,7 +121,7 @@ export default function AdminPage() {
     await supabase.from("profiles").update({ activo }).eq("id", id);
   }
 
-  async function cambiarRol(id: string, r: "admin" | "subcuenta") {
+  async function cambiarRol(id: string, r: string) {
     setUsuarios((prev) => prev.map((u) => (u.id === id ? { ...u, rol: r } : u)));
     await supabase.from("profiles").update({ rol: r }).eq("id", id);
   }
@@ -248,11 +249,14 @@ export default function AdminPage() {
             <label className="mb-1.5 block text-xs font-medium">Rol</label>
             <select
               value={rol}
-              onChange={(e) => setRol(e.target.value as "admin" | "subcuenta")}
+              onChange={(e) => setRol(e.target.value)}
               className={inputCls}
             >
-              <option value="subcuenta">Colaborador</option>
-              <option value="admin">Administrador</option>
+              {ROLES.map((r) => (
+                <option key={r.valor} value={r.valor}>
+                  {r.label}
+                </option>
+              ))}
             </select>
           </div>
           <button
@@ -321,13 +325,14 @@ export default function AdminPage() {
                     <select
                       value={u.rol}
                       disabled={esYo}
-                      onChange={(e) =>
-                        cambiarRol(u.id, e.target.value as "admin" | "subcuenta")
-                      }
+                      onChange={(e) => cambiarRol(u.id, e.target.value)}
                       className="rounded-lg border border-border bg-white px-2.5 py-1.5 text-sm outline-none disabled:opacity-50"
                     >
-                      <option value="subcuenta">Colaborador</option>
-                      <option value="admin">Administrador</option>
+                      {ROLES.map((r) => (
+                        <option key={r.valor} value={r.valor}>
+                          {r.label}
+                        </option>
+                      ))}
                     </select>
                     <button
                       onClick={() => toggleActivo(u.id, !u.activo)}
@@ -362,8 +367,8 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                {/* Asignación de proyectos (colaboradores) */}
-                {u.rol === "subcuenta" && (
+                {/* Asignación de proyectos (roles por asignación) */}
+                {accesoPorAsignacion(u.rol) && (
                   <div className="mt-4 border-t border-border pt-3">
                     <p className="mb-2 text-xs font-medium text-muted">
                       Proyectos que puede ver:
