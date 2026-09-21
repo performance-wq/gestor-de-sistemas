@@ -13,6 +13,10 @@ import {
 
 type Fase = "cargando" | "invalido" | "intro" | "form" | "enviado" | "cerrado";
 
+// Solo V2: campos que completa el mentor/consultor, no el empresario.
+// (Aviso puramente informativo; no cambia lógica ni respuestas.)
+const CAMPOS_MENTOR_V2 = new Set(["v2_prompt_maestro", "v2_info_adicional"]);
+
 export default function OnboardingPage() {
   const { token } = useParams<{ token: string }>();
   const supabase = createClient();
@@ -285,6 +289,23 @@ export default function OnboardingPage() {
               {pregunta.ayuda}
             </p>
           )}
+
+          {/* Solo V2: indicación de quién debe completar la pregunta. */}
+          {version === 2 &&
+            (CAMPOS_MENTOR_V2.has(pregunta.id) ? (
+              <div className="mx-auto mt-4 inline-flex max-w-lg items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-left text-sm text-amber-800">
+                <span aria-hidden>⚠️</span>
+                <span>
+                  Este campo debe ser completado únicamente por el{" "}
+                  <strong>mentor o consultor</strong> encargado del proyecto.
+                </span>
+              </div>
+            ) : (
+              <div className="mx-auto mt-4 inline-flex max-w-lg items-center gap-2 rounded-lg bg-sky-50 px-3 py-1.5 text-left text-xs font-medium text-sky-700">
+                <span aria-hidden>👤</span>
+                <span>Esta información debe ser completada por el empresario.</span>
+              </div>
+            ))}
 
           <div className="mt-8 text-left">
             <CampoOnboarding
