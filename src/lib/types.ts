@@ -33,6 +33,7 @@ export interface Proyecto {
   palabrasClave?: string;
   fechaIncorporacion: string;
   fechaCierre?: string;
+  responsableImplementacion?: string | null;
   // Datos de control del proyecto
   resultadoAntes?: number | null;
   resultadoAntesFecha?: string | null;

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useStore } from "@/lib/store";
+import { esGestor, listarMiembros, type Miembro } from "@/lib/tasks";
 import { proyectoStats, sistemaStats } from "@/lib/progress";
 import { ESTADOS, estadoStyles, formatFecha } from "@/lib/ui";
 import type { Estado } from "@/lib/types";
@@ -35,6 +36,7 @@ export default function ProyectoView() {
   const router = useRouter();
   const {
     cargado,
+    usuario,
     getProyecto,
     actualizarProyecto,
     eliminarProyecto,
@@ -42,6 +44,11 @@ export default function ProyectoView() {
   } = useStore();
   const [nuevoSistema, setNuevoSistema] = useState("");
   const [fase, setFase] = useState<Fase>("implementacion");
+  const [miembros, setMiembros] = useState<Miembro[]>([]);
+
+  useEffect(() => {
+    listarMiembros().then(setMiembros);
+  }, []);
 
   // Recuerda la fase en el hash de la URL (sin Suspense ni recargas).
   useEffect(() => {
@@ -134,6 +141,37 @@ export default function ProyectoView() {
             />
             <FilaDato etiqueta="Cierre" valor={formatFecha(proyecto.fechaCierre)} />
           </dl>
+          <div className="mt-3 border-t border-border pt-3">
+            <div className="mb-1 text-xs text-muted">
+              Responsable de implementación
+            </div>
+            {esGestor(usuario?.rol) ? (
+              <select
+                value={proyecto.responsableImplementacion ?? ""}
+                onChange={(e) =>
+                  actualizarProyecto(proyecto.id, {
+                    responsableImplementacion: e.target.value || null,
+                  })
+                }
+                className="w-full rounded-lg border border-border bg-white px-2 py-1.5 text-sm font-medium outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+              >
+                <option value="">Sin asignar</option>
+                {miembros.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.nombre}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className="text-sm font-medium">
+                {proyecto.responsableImplementacion
+                  ? miembros.find(
+                      (m) => m.id === proyecto.responsableImplementacion,
+                    )?.nombre ?? "—"
+                  : "Sin asignar"}
+              </div>
+            )}
+          </div>
           <div className="mt-3 border-t border-border pt-3">
             <div className="mb-1 flex items-center justify-between text-sm">
               <span className="text-muted">Avance general</span>

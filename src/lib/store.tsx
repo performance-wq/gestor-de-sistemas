@@ -113,6 +113,8 @@ function mapProyecto(p: Row): Proyecto {
     palabrasClave: (p.palabras_clave as string) ?? undefined,
     fechaIncorporacion: (p.fecha_incorporacion as string) ?? "",
     fechaCierre: (p.fecha_cierre as string) ?? undefined,
+    responsableImplementacion:
+      (p.responsable_implementacion as string) ?? null,
     resultadoAntes: (p.resultado_antes as number) ?? null,
     resultadoAntesFecha: (p.resultado_antes_fecha as string) ?? null,
     resultadoCon: (p.resultado_con as number) ?? null,
@@ -241,6 +243,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         row.fecha_incorporacion = patch.fechaIncorporacion || null;
       if (patch.fechaCierre !== undefined)
         row.fecha_cierre = patch.fechaCierre || null;
+      if (patch.responsableImplementacion !== undefined)
+        row.responsable_implementacion = patch.responsableImplementacion || null;
       if (patch.resultadoAntes !== undefined)
         row.resultado_antes = patch.resultadoAntes;
       if (patch.resultadoAntesFecha !== undefined)
