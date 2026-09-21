@@ -2,8 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Modal } from "./Modal";
+import { VisorMedia } from "./VisorMedia";
 import { useStore } from "@/lib/store";
 import { etiquetaRol } from "@/lib/roles";
+import { subirAsset, urlFirmada } from "@/lib/storage";
+import { descargarArchivo } from "@/lib/download";
 import { formatFecha, formatFechaHora } from "@/lib/ui";
 import {
   chipEstado,
@@ -56,6 +59,8 @@ export function TareaDetalle({
   const [nuevoComentario, setNuevoComentario] = useState("");
   const [editando, setEditando] = useState(false);
   const [tab, setTab] = useState<"comentarios" | "historial">("comentarios");
+  const [evidenciaUrl, setEvidenciaUrl] = useState<string | null>(null);
+  const [visor, setVisor] = useState(false);
 
   const nombrePorId = useMemo(() => {
     const m: Record<string, string> = {};
@@ -79,6 +84,19 @@ export function TareaDetalle({
     cargar();
     listarMiembros().then(setMiembros);
   }, [cargar]);
+
+  // Resuelve la URL firmada de la evidencia cuando cambia.
+  useEffect(() => {
+    let vivo = true;
+    if (tarea?.evidencia) {
+      urlFirmada(tarea.evidencia).then((u) => vivo && setEvidenciaUrl(u));
+    } else {
+      setEvidenciaUrl(null);
+    }
+    return () => {
+      vivo = false;
+    };
+  }, [tarea?.evidencia]);
 
   const proyecto = useMemo(
     () => proyectos.find((p) => p.id === tarea?.proyectoId),
@@ -220,6 +238,47 @@ export function TareaDetalle({
               </p>
             </div>
           )}
+
+          {tarea.evidencia && (
+            <div>
+              <div className="mb-1 text-xs font-medium uppercase tracking-wide text-muted">
+                Evidencia
+              </div>
+              {evidenciaUrl ? (
+                <button
+                  onClick={() => setVisor(true)}
+                  className="group relative block overflow-hidden rounded-lg border border-border"
+                  title="Ver en grande"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={evidenciaUrl}
+                    alt="Evidencia"
+                    className="h-32 w-auto max-w-full object-cover transition-transform group-hover:scale-[1.02]"
+                  />
+                  <span className="absolute bottom-1 right-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">
+                    🔍 Ampliar
+                  </span>
+                </button>
+              ) : (
+                <p className="text-sm text-muted">Cargando imagen…</p>
+              )}
+            </div>
+          )}
+
+          <VisorMedia
+            abierto={visor}
+            onClose={() => setVisor(false)}
+            titulo={`Evidencia — ${tarea.titulo}`}
+            copy={tarea.descripcion || ""}
+            tipo="imagen"
+            url={evidenciaUrl}
+            onDescargar={
+              evidenciaUrl
+                ? () => descargarArchivo(evidenciaUrl, "evidencia.jpg")
+                : undefined
+            }
+          />
 
           {/* Acciones de estado */}
           <div className="flex flex-wrap gap-2">
@@ -435,8 +494,20 @@ function EdicionTarea({
   );
   const [deadline, setDeadline] = useState<string>(tarea.deadline ?? "");
   const [sistemaId, setSistemaId] = useState<string>(tarea.sistemaId ?? "");
+  const [evidencia, setEvidencia] = useState<string | null>(tarea.evidencia);
+  const [evidPreview, setEvidPreview] = useState<string | null>(null);
+  const [subiendoEvid, setSubiendoEvid] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let vivo = true;
+    if (tarea.evidencia)
+      urlFirmada(tarea.evidencia).then((u) => vivo && setEvidPreview(u));
+    return () => {
+      vivo = false;
+    };
+  }, [tarea.evidencia]);
 
   async function guardar() {
     setGuardando(true);
@@ -453,6 +524,8 @@ function EdicionTarea({
         setDeadline: (deadline || null) !== tarea.deadline,
         sistemaId: sistemaId || null,
         setSistema: (sistemaId || null) !== tarea.sistemaId,
+        evidencia: evidencia,
+        setEvidencia: evidencia !== tarea.evidencia,
       });
       onSaved();
     } catch (e) {
@@ -554,6 +627,77 @@ function EdicionTarea({
           </select>
         </div>
       )}
+      {/* Evidencia: reemplazar o quitar */}
+      <div>
+        <label className="mb-1 block text-sm font-medium">
+          Evidencia <span className="font-normal text-muted">(opcional)</span>
+        </label>
+        {evidencia ? (
+          <div className="flex items-center gap-3">
+            {evidPreview && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={evidPreview}
+                alt="Evidencia"
+                className="h-20 w-20 rounded-lg border border-border object-cover"
+              />
+            )}
+            <div className="flex flex-col gap-1">
+              <label className="cursor-pointer text-sm font-medium text-accent hover:underline">
+                {subiendoEvid ? "Subiendo…" : "Reemplazar"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={subiendoEvid}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setSubiendoEvid(true);
+                    const path = await subirAsset(file, "tareas");
+                    setSubiendoEvid(false);
+                    if (path) {
+                      setEvidencia(path);
+                      setEvidPreview(URL.createObjectURL(file));
+                    }
+                  }}
+                />
+              </label>
+              <button
+                onClick={() => {
+                  setEvidencia(null);
+                  setEvidPreview(null);
+                }}
+                className="text-left text-sm font-medium text-red-600 hover:underline"
+              >
+                Quitar
+              </button>
+            </div>
+          </div>
+        ) : (
+          <label className="flex cursor-pointer items-center justify-center rounded-lg border border-dashed border-border bg-surface px-3 py-3 text-sm text-muted hover:border-accent hover:text-foreground">
+            {subiendoEvid ? "Subiendo…" : "📎 Subir imagen"}
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              disabled={subiendoEvid}
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                setSubiendoEvid(true);
+                const path = await subirAsset(file, "tareas");
+                setSubiendoEvid(false);
+                if (path) {
+                  setEvidencia(path);
+                  setEvidPreview(URL.createObjectURL(file));
+                }
+              }}
+            />
+          </label>
+        )}
+      </div>
+
       {error && (
         <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
           {error}

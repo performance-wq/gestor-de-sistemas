@@ -104,6 +104,7 @@ export interface Tarea {
   requiereValidacion: boolean;
   reabiertaCount: number;
   cerradaAt: string | null;
+  evidencia: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -162,6 +163,7 @@ function mapTarea(r: Row): Tarea {
     requiereValidacion: (r.requiere_validacion as boolean) ?? false,
     reabiertaCount: (r.reabierta_count as number) ?? 0,
     cerradaAt: (r.cerrada_at as string) ?? null,
+    evidencia: (r.evidencia as string) ?? null,
     createdAt: (r.created_at as string) ?? "",
     updatedAt: (r.updated_at as string) ?? "",
   };
@@ -323,6 +325,7 @@ export interface CrearTareaInput {
   sistemaId?: string | null;
   descripcion?: string;
   requiereValidacion?: boolean;
+  evidencia?: string | null;
 }
 
 export async function crearTarea(input: CrearTareaInput): Promise<string | null> {
@@ -337,6 +340,7 @@ export async function crearTarea(input: CrearTareaInput): Promise<string | null>
     p_sistema_id: input.sistemaId || null,
     p_descripcion: input.descripcion ?? "",
     p_requiere_validacion: input.requiereValidacion ?? false,
+    p_evidencia: input.evidencia || null,
   });
   if (error) {
     throw new Error(error.message);
@@ -369,6 +373,8 @@ export interface EditarTareaPatch {
   setResponsable?: boolean;
   setDeadline?: boolean;
   setSistema?: boolean;
+  evidencia?: string | null;
+  setEvidencia?: boolean;
 }
 
 export async function editarTarea(id: string, patch: EditarTareaPatch): Promise<void> {
@@ -385,6 +391,8 @@ export async function editarTarea(id: string, patch: EditarTareaPatch): Promise<
     p_set_responsable: patch.setResponsable ?? false,
     p_set_deadline: patch.setDeadline ?? false,
     p_set_sistema: patch.setSistema ?? false,
+    p_evidencia: patch.evidencia ?? null,
+    p_set_evidencia: patch.setEvidencia ?? false,
   });
   if (error) throw new Error(error.message);
 }

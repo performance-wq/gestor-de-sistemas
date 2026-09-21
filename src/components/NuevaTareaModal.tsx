@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Modal } from "./Modal";
 import { useStore } from "@/lib/store";
+import { subirAsset } from "@/lib/storage";
 import {
   crearTarea,
   listarMiembros,
@@ -40,6 +41,9 @@ export function NuevaTareaModal({
   const [descripcion, setDescripcion] = useState("");
   const [requiereValidacion, setRequiereValidacion] = useState(false);
   const [mostrarOpcionales, setMostrarOpcionales] = useState(false);
+  const [evidencia, setEvidencia] = useState<string | null>(null);
+  const [evidenciaPreview, setEvidenciaPreview] = useState<string | null>(null);
+  const [subiendoEvid, setSubiendoEvid] = useState(false);
 
   const [miembros, setMiembros] = useState<Miembro[]>([]);
   const [guardando, setGuardando] = useState(false);
@@ -89,6 +93,7 @@ export function NuevaTareaModal({
         sistemaId: sistemaId || null,
         descripcion: descripcion || "",
         requiereValidacion,
+        evidencia,
       });
       if (id && onCreated) onCreated(id);
       onClose();
@@ -287,6 +292,59 @@ export function NuevaTareaModal({
                 placeholder="Contexto o detalle de la tarea…"
                 className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
               />
+            </div>
+
+            {/* Evidencia (1 imagen opcional) */}
+            <div>
+              <label className="mb-1 block text-sm font-medium">
+                Evidencia <span className="font-normal text-muted">(opcional)</span>
+              </label>
+              <p className="mb-2 text-xs text-muted">
+                Una imagen: captura, bug, referencia visual o instrucción gráfica.
+              </p>
+              {evidenciaPreview ? (
+                <div className="flex items-center gap-3">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={evidenciaPreview}
+                    alt="Evidencia"
+                    className="h-20 w-20 rounded-lg border border-border object-cover"
+                  />
+                  <button
+                    onClick={() => {
+                      setEvidencia(null);
+                      setEvidenciaPreview(null);
+                    }}
+                    className="text-sm font-medium text-red-600 hover:underline"
+                  >
+                    Quitar imagen
+                  </button>
+                </div>
+              ) : (
+                <label className="flex cursor-pointer items-center justify-center rounded-lg border border-dashed border-border bg-surface px-3 py-4 text-sm text-muted hover:border-accent hover:text-foreground">
+                  {subiendoEvid ? "Subiendo…" : "📎 Subir imagen"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={subiendoEvid}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      setSubiendoEvid(true);
+                      setError(null);
+                      const path = await subirAsset(file, "tareas");
+                      setSubiendoEvid(false);
+                      if (!path) {
+                        setError("No se pudo subir la imagen.");
+                        return;
+                      }
+                      setEvidencia(path);
+                      setEvidenciaPreview(URL.createObjectURL(file));
+                    }}
+                  />
+                </label>
+              )}
             </div>
           </div>
         )}
