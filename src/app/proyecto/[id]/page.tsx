@@ -45,6 +45,7 @@ export default function ProyectoView() {
   const [nuevoSistema, setNuevoSistema] = useState("");
   const [fase, setFase] = useState<Fase>("implementacion");
   const [miembros, setMiembros] = useState<Miembro[]>([]);
+  const gestor = esGestor(usuario?.rol);
 
   useEffect(() => {
     listarMiembros().then(setMiembros);
@@ -96,42 +97,50 @@ export default function ProyectoView() {
           {proyecto.nicho && (
             <p className="mt-0.5 text-sm text-muted">{proyecto.nicho}</p>
           )}
-          <div className="mt-3">
-            <button
-              onClick={() => {
-                if (
-                  confirm(
-                    `¿Eliminar el proyecto "${proyecto.nombre}"? Esta acción no se puede deshacer.`,
-                  )
-                ) {
-                  eliminarProyecto(proyecto.id);
-                  router.push("/dashboard");
-                }
-              }}
-              className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
-            >
-              Eliminar proyecto
-            </button>
-          </div>
+          {gestor && (
+            <div className="mt-3">
+              <button
+                onClick={() => {
+                  if (
+                    confirm(
+                      `¿Eliminar el proyecto "${proyecto.nombre}"? Esta acción no se puede deshacer.`,
+                    )
+                  ) {
+                    eliminarProyecto(proyecto.id);
+                    router.push("/dashboard");
+                  }
+                }}
+                className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
+              >
+                Eliminar proyecto
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Derecha: tarjeta de datos */}
         <div className="w-full shrink-0 rounded-xl border border-border bg-background/60 p-4 md:w-72">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs text-muted">Estado</span>
-            <select
-              value={proyecto.estado}
-              onChange={(e) =>
-                actualizarProyecto(proyecto.id, {
-                  estado: e.target.value as Estado,
-                })
-              }
-              className="rounded-lg border border-border bg-white px-2 py-1 text-sm font-medium outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
-            >
-              {ESTADOS.map((e) => (
-                <option key={e}>{e}</option>
-              ))}
-            </select>
+            {gestor ? (
+              <select
+                value={proyecto.estado}
+                onChange={(e) =>
+                  actualizarProyecto(proyecto.id, {
+                    estado: e.target.value as Estado,
+                  })
+                }
+                className="rounded-lg border border-border bg-white px-2 py-1 text-sm font-medium outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+              >
+                {ESTADOS.map((e) => (
+                  <option key={e}>{e}</option>
+                ))}
+              </select>
+            ) : (
+              <span className="rounded-lg bg-slate-100 px-2 py-1 text-sm font-medium">
+                {proyecto.estado}
+              </span>
+            )}
           </div>
           <dl className="mt-3 space-y-1.5 text-sm">
             <FilaDato etiqueta="Cliente" valor={proyecto.cliente || "—"} />
@@ -265,7 +274,8 @@ export default function ProyectoView() {
                 );
               })}
 
-              {/* Agregar sistema */}
+              {/* Agregar sistema (solo gestores) */}
+              {gestor && (
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -293,6 +303,7 @@ export default function ProyectoView() {
                   </button>
                 </div>
               </form>
+              )}
             </div>
           </div>
         )}
