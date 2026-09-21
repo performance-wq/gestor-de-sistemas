@@ -7,6 +7,7 @@ import {
   ESTADOS_TAREA,
   PRIORIDADES,
   TIPOS,
+  esGestor,
   listarMiembros,
   listarTareas,
   type Miembro,
@@ -34,6 +35,7 @@ export default function GestionTareas() {
 
   const [nueva, setNueva] = useState(false);
   const [detalle, setDetalle] = useState<string | null>(null);
+  const puedeCrear = esGestor(usuario?.rol);
 
   const cargar = useCallback(async () => {
     const t = await listarTareas();
@@ -112,12 +114,14 @@ export default function GestionTareas() {
             {tareas.length} en total
           </p>
         </div>
-        <button
-          onClick={() => setNueva(true)}
-          className="rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-opacity hover:opacity-90"
-        >
-          + Nueva tarea
-        </button>
+        {puedeCrear && (
+          <button
+            onClick={() => setNueva(true)}
+            className="rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-opacity hover:opacity-90"
+          >
+            + Nueva tarea
+          </button>
+        )}
       </div>
 
       {/* Buscador */}
@@ -214,7 +218,7 @@ export default function GestionTareas() {
         )}
       </div>
 
-      {nueva && (
+      {nueva && puedeCrear && (
         <NuevaTareaModal
           onClose={() => setNueva(false)}
           onCreated={() => cargar()}

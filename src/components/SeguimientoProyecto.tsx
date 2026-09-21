@@ -1,9 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useStore } from "@/lib/store";
 import {
   ESTADOS_ABIERTOS,
   ESTADOS_TAREA,
+  esGestor,
   listarMiembros,
   listarTareasProyecto,
   type Miembro,
@@ -19,6 +21,8 @@ type FiltroEstado = TareaEstado | "abiertas" | "todas";
 // Fase "Seguimiento" del proyecto: tareas ligadas a este proyecto (por id).
 // Crear tarea aquí preselecciona y bloquea el proyecto.
 export function SeguimientoProyecto({ proyectoId }: { proyectoId: string }) {
+  const { usuario } = useStore();
+  const puedeCrear = esGestor(usuario?.rol);
   const [tareas, setTareas] = useState<Tarea[]>([]);
   const [miembros, setMiembros] = useState<Miembro[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -63,12 +67,14 @@ export function SeguimientoProyecto({ proyectoId }: { proyectoId: string }) {
             {abiertas.length === 1 ? "" : "s"} de {tareas.length}
           </p>
         </div>
-        <button
-          onClick={() => setNueva(true)}
-          className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white shadow-sm transition-opacity hover:opacity-90"
-        >
-          + Nueva tarea
-        </button>
+        {puedeCrear && (
+          <button
+            onClick={() => setNueva(true)}
+            className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white shadow-sm transition-opacity hover:opacity-90"
+          >
+            + Nueva tarea
+          </button>
+        )}
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -100,7 +106,7 @@ export function SeguimientoProyecto({ proyectoId }: { proyectoId: string }) {
         )}
       </div>
 
-      {nueva && (
+      {nueva && puedeCrear && (
         <NuevaTareaModal
           proyectoIdFijo={proyectoId}
           onClose={() => setNueva(false)}

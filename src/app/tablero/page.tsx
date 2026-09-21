@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useStore } from "@/lib/store";
 import {
   ESTADOS_ABIERTOS,
@@ -9,6 +10,7 @@ import {
   PRIORIDADES,
   chipEstado,
   chipPrioridad,
+  esGestor,
   etiquetaEstado,
   etiquetaPrioridad,
   listarMiembros,
@@ -20,18 +22,34 @@ import {
 // Tablero de indicadores operativos (Fase 8). Todo se calcula en cliente a
 // partir de las tareas visibles según la RLS del usuario.
 export default function Tablero() {
-  const { usuario, proyectos } = useStore();
+  const { usuario, proyectos, cargado } = useStore();
+  const router = useRouter();
   const [tareas, setTareas] = useState<Tarea[]>([]);
   const [miembros, setMiembros] = useState<Miembro[]>([]);
   const [cargando, setCargando] = useState(true);
 
+  // El Tablero es solo para gestores (admin/pm/coordinación). Un ejecutor que
+  // llegue por URL directa es redirigido a Proyectos.
+  const permitido = esGestor(usuario?.rol);
   useEffect(() => {
+    if (cargado && !permitido) router.replace("/dashboard");
+  }, [cargado, permitido, router]);
+
+  useEffect(() => {
+    if (!permitido) return;
     listarTareas().then((t) => {
       setTareas(t);
       setCargando(false);
     });
     listarMiembros().then(setMiembros);
-  }, []);
+  }, [permitido]);
+
+  if (cargado && !permitido)
+    return (
+      <div className="py-20 text-center text-sm text-muted">
+        No tienes acceso a esta sección.
+      </div>
+    );
 
   const hoy = new Date().toISOString().slice(0, 10);
   const abiertas = useMemo(

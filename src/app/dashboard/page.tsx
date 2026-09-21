@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/store";
+import { esGestor } from "@/lib/tasks";
 import { proyectoStats } from "@/lib/progress";
 import { ESTADOS, NICHOS, estadoStyles, formatFecha } from "@/lib/ui";
 import { listarNichos } from "@/lib/nichos";
@@ -14,7 +15,8 @@ import { NuevoProyectoModal } from "@/components/NuevoProyectoModal";
 type FiltroEstado = Estado | "Todos";
 
 export default function Dashboard() {
-  const { proyectos, cargado } = useStore();
+  const { proyectos, cargado, usuario } = useStore();
+  const puedeCrear = esGestor(usuario?.rol);
   const [busqueda, setBusqueda] = useState("");
   const [fEstado, setFEstado] = useState<FiltroEstado>("Todos");
   const [fNicho, setFNicho] = useState<string>("Todos");
@@ -51,12 +53,14 @@ export default function Dashboard() {
             implementaciones CRM
           </p>
         </div>
-        <button
-          onClick={() => setModal(true)}
-          className="rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-opacity hover:opacity-90"
-        >
-          + Nuevo proyecto
-        </button>
+        {puedeCrear && (
+          <button
+            onClick={() => setModal(true)}
+            className="rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-opacity hover:opacity-90"
+          >
+            + Nuevo proyecto
+          </button>
+        )}
       </div>
 
       {/* Buscador */}
@@ -112,6 +116,7 @@ export default function Dashboard() {
         ) : visibles.length === 0 ? (
           <EmptyState
             hayProyectos={proyectos.length > 0}
+            puedeCrear={puedeCrear}
             onNuevo={() => setModal(true)}
           />
         ) : (
@@ -164,16 +169,20 @@ export default function Dashboard() {
         )}
       </div>
 
-      {modal && <NuevoProyectoModal onClose={() => setModal(false)} />}
+      {modal && puedeCrear && (
+        <NuevoProyectoModal onClose={() => setModal(false)} />
+      )}
     </div>
   );
 }
 
 function EmptyState({
   hayProyectos,
+  puedeCrear,
   onNuevo,
 }: {
   hayProyectos: boolean;
+  puedeCrear: boolean;
   onNuevo: () => void;
 }) {
   return (
@@ -191,12 +200,14 @@ function EmptyState({
           ? "Prueba con otros filtros o crea un proyecto nuevo."
           : "Crea tu primer proyecto y se cargarán los sistemas de la plantilla automáticamente."}
       </p>
-      <button
-        onClick={onNuevo}
-        className="mt-5 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
-      >
-        + Nuevo proyecto
-      </button>
+      {puedeCrear && (
+        <button
+          onClick={onNuevo}
+          className="mt-5 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+        >
+          + Nuevo proyecto
+        </button>
+      )}
     </div>
   );
 }
