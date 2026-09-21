@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserMenu } from "./UserMenu";
+import { NotificacionesMenu } from "./NotificacionesMenu";
 
 const NAV = [
+  { href: "/tablero", label: "Tablero", match: ["/tablero"] },
   { href: "/dashboard", label: "Proyectos", match: ["/dashboard", "/proyecto"] },
   { href: "/tareas", label: "Gestión de tareas", match: ["/tareas"] },
 ];
@@ -42,7 +44,10 @@ export function AppHeader() {
             })}
           </nav>
         </div>
-        <UserMenu />
+        <div className="flex items-center gap-1">
+          <NotificacionesMenu />
+          <UserMenu />
+        </div>
       </div>
     </header>
   );
