@@ -3,24 +3,27 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   estadoCronometro,
-  formatHM,
   formatReloj,
   listarEventosTarea,
   registrarTiempo,
-  totalTareaMs,
   type EventoTiempo,
   type RegistroTiempo,
 } from "@/lib/tiempo";
 
-// Cronómetro por tarea: cada quien registra su propio tiempo de trabajo.
-// Iniciar → Pausar/Reanudar → Finalizar. Alimenta las horas hombre del
-// Dashboard de Performance.
+// Cronómetro por tarea (Iniciar/Pausar/Reanudar). El "Terminar" lo maneja
+// el detalle de la tarea (cierra el cronómetro y enruta la tarea).
 export function CronometroTarea({
   tareaId,
   userId,
+  labelIniciar = "Iniciar tarea",
+  refreshKey = 0,
+  onCambio,
 }: {
   tareaId: string;
   userId: string;
+  labelIniciar?: string;
+  refreshKey?: number;
+  onCambio?: () => void;
 }) {
   const [eventos, setEventos] = useState<RegistroTiempo[]>([]);
   const [ahora, setAhora] = useState(Date.now());
@@ -33,18 +36,15 @@ export function CronometroTarea({
 
   useEffect(() => {
     cargar();
-  }, [cargar]);
+  }, [cargar, refreshKey]);
 
   const { estado, acumuladoMs } = estadoCronometro(eventos, userId, ahora);
 
-  // Reloj en vivo mientras está en curso.
   useEffect(() => {
     if (estado !== "en_curso") return;
     const t = setInterval(() => setAhora(Date.now()), 1000);
     return () => clearInterval(t);
   }, [estado]);
-
-  const totalTarea = totalTareaMs(eventos, ahora);
 
   async function accion(evento: EventoTiempo) {
     setOcupado(true);
@@ -53,6 +53,7 @@ export function CronometroTarea({
       await registrarTiempo(tareaId, evento);
       setAhora(Date.now());
       await cargar();
+      onCambio?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo registrar.");
     } finally {
@@ -78,7 +79,7 @@ export function CronometroTarea({
                 : "bg-slate-100 text-slate-500 ring-slate-200"
           }`}
         >
-          {enCurso ? "En curso" : enPausa ? "En pausa" : "Detenido"}
+          {enCurso ? "En curso" : enPausa ? "En pausa" : "Sin iniciar"}
         </span>
       </div>
 
@@ -92,44 +93,28 @@ export function CronometroTarea({
         </div>
         <div className="flex flex-wrap gap-2">
           {estado === "detenido" && (
-            <BotonCron onClick={() => accion("inicio")} disabled={ocupado} tono="verde">
-              ▶ Iniciar
-            </BotonCron>
+            <Boton onClick={() => accion("inicio")} disabled={ocupado} tono="verde">
+              ▶ {labelIniciar}
+            </Boton>
           )}
           {enCurso && (
-            <>
-              <BotonCron onClick={() => accion("pausa")} disabled={ocupado} tono="ambar">
-                ⏸ Pausar
-              </BotonCron>
-              <BotonCron onClick={() => accion("fin")} disabled={ocupado} tono="gris">
-                ⏹ Finalizar
-              </BotonCron>
-            </>
+            <Boton onClick={() => accion("pausa")} disabled={ocupado} tono="ambar">
+              ⏸ Pausar
+            </Boton>
           )}
           {enPausa && (
-            <>
-              <BotonCron onClick={() => accion("reanudacion")} disabled={ocupado} tono="verde">
-                ▶ Reanudar
-              </BotonCron>
-              <BotonCron onClick={() => accion("fin")} disabled={ocupado} tono="gris">
-                ⏹ Finalizar
-              </BotonCron>
-            </>
+            <Boton onClick={() => accion("reanudacion")} disabled={ocupado} tono="verde">
+              ▶ Reanudar
+            </Boton>
           )}
         </div>
       </div>
-
-      {totalTarea > 0 && (
-        <p className="mt-2 text-xs text-muted">
-          Total en la tarea (todo el equipo): {formatHM(totalTarea)}
-        </p>
-      )}
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
     </div>
   );
 }
 
-function BotonCron({
+function Boton({
   onClick,
   disabled,
   tono,
@@ -137,15 +122,13 @@ function BotonCron({
 }: {
   onClick: () => void;
   disabled?: boolean;
-  tono: "verde" | "ambar" | "gris";
+  tono: "verde" | "ambar";
   children: React.ReactNode;
 }) {
   const clase =
     tono === "verde"
       ? "bg-emerald-600 text-white hover:opacity-90"
-      : tono === "ambar"
-        ? "border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100"
-        : "border border-border text-muted hover:bg-slate-50";
+      : "border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100";
   return (
     <button
       onClick={onClick}

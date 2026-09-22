@@ -8,6 +8,7 @@
 import { createClient } from "./supabase/client";
 
 export type EventoTiempo = "inicio" | "pausa" | "reanudacion" | "fin";
+export type TipoSesion = "ejecucion" | "revision" | "correccion";
 export type EstadoCronometro = "detenido" | "en_curso" | "en_pausa";
 
 export interface RegistroTiempo {
@@ -15,6 +16,7 @@ export interface RegistroTiempo {
   taskId: string;
   userId: string | null;
   evento: EventoTiempo;
+  tipo: TipoSesion;
   createdAt: string; // ISO
   t: number; // ms epoch
 }
@@ -28,6 +30,7 @@ function mapRegistro(r: Row): RegistroTiempo {
     taskId: r.task_id as string,
     userId: (r.user_id as string) ?? null,
     evento: r.evento as EventoTiempo,
+    tipo: ((r.tipo as string) ?? "ejecucion") as TipoSesion,
     createdAt: iso,
     t: new Date(iso).getTime(),
   };
@@ -72,28 +75,118 @@ export async function registrarTiempo(
   if (error) throw new Error(error.message);
 }
 
+// El ejecutor termina su trabajo → En revisión o Cerrada.
+export async function terminarTarea(taskId: string): Promise<string> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("tarea_terminar", {
+    p_task_id: taskId,
+  });
+  if (error) throw new Error(error.message);
+  return (data as string) ?? "";
+}
+
+// El gestor finaliza la revisión: aprobar o solicitar correcciones.
+export async function revisionTerminar(
+  taskId: string,
+  resultado: "aprobar" | "correcciones",
+  motivo?: string,
+): Promise<string> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("revision_terminar", {
+    p_task_id: taskId,
+    p_resultado: resultado,
+    p_motivo: motivo || null,
+  });
+  if (error) throw new Error(error.message);
+  return (data as string) ?? "";
+}
+
 // ---------- Cálculo de intervalos ----------
 export interface Intervalo {
   start: number;
   end: number | null; // null = en curso
+  tipo: TipoSesion;
 }
 
 /** Empareja arranques con paradas para una lista de eventos ORDENADA asc. */
 export function intervalosDe(eventos: RegistroTiempo[]): Intervalo[] {
   const out: Intervalo[] = [];
   let cur: number | null = null;
+  let curTipo: TipoSesion = "ejecucion";
   for (const e of eventos) {
     if (e.evento === "inicio" || e.evento === "reanudacion") {
-      if (cur === null) cur = e.t;
+      if (cur === null) {
+        cur = e.t;
+        curTipo = e.tipo;
+      }
     } else if (e.evento === "pausa" || e.evento === "fin") {
       if (cur !== null) {
-        out.push({ start: cur, end: e.t });
+        out.push({ start: cur, end: e.t, tipo: curTipo });
         cur = null;
       }
     }
   }
-  if (cur !== null) out.push({ start: cur, end: null });
+  if (cur !== null) out.push({ start: cur, end: null, tipo: curTipo });
   return out;
+}
+
+// ---------- Desglose de tiempos por tarea ----------
+export interface TiemposTarea {
+  ejecutorMs: number; // ejecucion + correccion
+  revisorMs: number; // revision
+  correccionMs: number;
+  totalMs: number;
+  nSesiones: number; // sesiones de trabajo (cualquier tipo)
+  nRevisiones: number; // sesiones de revision
+  nCorrecciones: number; // sesiones de correccion (≈ devoluciones)
+}
+
+function vacio(): TiemposTarea {
+  return {
+    ejecutorMs: 0,
+    revisorMs: 0,
+    correccionMs: 0,
+    totalMs: 0,
+    nSesiones: 0,
+    nRevisiones: 0,
+    nCorrecciones: 0,
+  };
+}
+
+/** Tiempos por tarea a partir de TODOS los eventos (agrupa por usuario). */
+export function tiemposPorTarea(
+  eventos: RegistroTiempo[],
+  ahora = Date.now(),
+): Map<string, TiemposTarea> {
+  // Agrupar por tarea+usuario para armar intervalos correctamente.
+  const grupos = new Map<string, RegistroTiempo[]>();
+  for (const e of eventos) {
+    if (!e.userId) continue;
+    const k = `${e.taskId}::${e.userId}`;
+    (grupos.get(k) ?? grupos.set(k, []).get(k)!).push(e);
+  }
+  const res = new Map<string, TiemposTarea>();
+  for (const [k, evs] of grupos) {
+    const taskId = k.split("::")[0];
+    const fila = res.get(taskId) ?? vacio();
+    for (const iv of intervalosDe(evs.sort((a, b) => a.t - b.t))) {
+      const dur = (iv.end ?? ahora) - iv.start;
+      fila.totalMs += dur;
+      fila.nSesiones += 1;
+      if (iv.tipo === "revision") {
+        fila.revisorMs += dur;
+        fila.nRevisiones += 1;
+      } else if (iv.tipo === "correccion") {
+        fila.ejecutorMs += dur;
+        fila.correccionMs += dur;
+        fila.nCorrecciones += 1;
+      } else {
+        fila.ejecutorMs += dur;
+      }
+    }
+    res.set(taskId, fila);
+  }
+  return res;
 }
 
 /** Estado del cronómetro de un usuario en una tarea + acumulado (ms). */

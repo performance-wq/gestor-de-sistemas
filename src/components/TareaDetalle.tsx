@@ -25,7 +25,6 @@ import {
   PRIORIDADES,
   reabrirTarea,
   TIPOS,
-  transicionesPermitidas,
   transicionTarea,
   type Miembro,
   type Tarea,
@@ -35,6 +34,14 @@ import {
   type TareaPrioridad,
   type TareaTipo,
 } from "@/lib/tasks";
+import {
+  formatHM,
+  listarEventosTarea,
+  revisionTerminar,
+  terminarTarea,
+  tiemposPorTarea,
+  type RegistroTiempo,
+} from "@/lib/tiempo";
 
 // Detalle de una tarea con acciones de estado, edición (gestores), comentarios
 // y el historial inmutable. El backend valida cada acción; aquí solo mostramos
@@ -62,6 +69,12 @@ export function TareaDetalle({
   const [tab, setTab] = useState<"comentarios" | "historial">("comentarios");
   const [evidenciaUrl, setEvidenciaUrl] = useState<string | null>(null);
   const [visor, setVisor] = useState(false);
+  const [eventos, setEventos] = useState<RegistroTiempo[]>([]);
+  const [cronoKey, setCronoKey] = useState(0);
+  const [confirmTerminar, setConfirmTerminar] = useState(false);
+  const [confirmRevision, setConfirmRevision] = useState(false);
+  const [motivoRev, setMotivoRev] = useState("");
+  const [accionando, setAccionando] = useState(false);
 
   const nombrePorId = useMemo(() => {
     const m: Record<string, string> = {};
@@ -70,16 +83,57 @@ export function TareaDetalle({
   }, [miembros]);
 
   const cargar = useCallback(async () => {
-    const [t, h, c] = await Promise.all([
+    const [t, h, c, ev] = await Promise.all([
       obtenerTarea(tareaId),
       listarHistorial(tareaId),
       listarComentarios(tareaId),
+      listarEventosTarea(tareaId),
     ]);
     setTarea(t);
     setHistorial(h);
     setComentarios(c);
+    setEventos(ev);
+    setCronoKey((k) => k + 1);
     setCargando(false);
   }, [tareaId]);
+
+  const tiempos = useMemo(
+    () => tiemposPorTarea(eventos).get(tareaId),
+    [eventos, tareaId],
+  );
+
+  async function terminar() {
+    if (!tarea) return;
+    setAccionando(true);
+    setError(null);
+    try {
+      await terminarTarea(tarea.id);
+      setConfirmTerminar(false);
+      await cargar();
+      onChanged?.();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo terminar la tarea.");
+    } finally {
+      setAccionando(false);
+    }
+  }
+
+  async function finalizarRevision(resultado: "aprobar" | "correcciones") {
+    if (!tarea) return;
+    setAccionando(true);
+    setError(null);
+    try {
+      await revisionTerminar(tarea.id, resultado, motivoRev || undefined);
+      setConfirmRevision(false);
+      setMotivoRev("");
+      await cargar();
+      onChanged?.();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo finalizar la revisión.");
+    } finally {
+      setAccionando(false);
+    }
+  }
 
   useEffect(() => {
     cargar();
@@ -149,9 +203,6 @@ export function TareaDetalle({
     }
   }
 
-  const opciones = tarea
-    ? transicionesPermitidas(tarea.estado, gestor, tarea.requiereValidacion)
-    : [];
 
   return (
     <Modal
@@ -281,26 +332,77 @@ export function TareaDetalle({
             }
           />
 
-          {/* Cronómetro de trabajo (registra horas hombre) */}
+          {/* Resumen de tiempos reales (cronómetro) */}
+          {tiempos && tiempos.totalMs > 0 && (
+            <div className="flex flex-wrap gap-x-4 gap-y-1 rounded-lg bg-slate-50 px-3 py-2 text-xs">
+              <span>
+                Ejecutor: <strong>{formatHM(tiempos.ejecutorMs)}</strong>
+              </span>
+              <span>
+                Revisor: <strong>{formatHM(tiempos.revisorMs)}</strong>
+              </span>
+              <span>
+                Total: <strong>{formatHM(tiempos.totalMs)}</strong>
+              </span>
+              <span className="text-muted">
+                {tiempos.nSesiones} sesión(es) · {tiempos.nRevisiones}{" "}
+                revisión(es) · {tiempos.nCorrecciones} corrección(es)
+              </span>
+            </div>
+          )}
+
+          {/* Cronómetro del EJECUTOR + Terminar tarea */}
           {usuario &&
-            tarea.estado !== "cerrada" &&
-            tarea.estado !== "cancelada" && (
-              <CronometroTarea tareaId={tarea.id} userId={usuario.id} />
+            ["pendiente", "en_proceso", "reabierta"].includes(tarea.estado) &&
+            (usuario.id === tarea.responsableId || gestor) && (
+              <div className="space-y-2">
+                <CronometroTarea
+                  tareaId={tarea.id}
+                  userId={usuario.id}
+                  labelIniciar="Iniciar tarea"
+                  refreshKey={cronoKey}
+                  onCambio={cargar}
+                />
+                <button
+                  onClick={() => setConfirmTerminar(true)}
+                  className="w-full rounded-lg bg-foreground px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 sm:w-auto"
+                >
+                  ✓ Terminar tarea
+                </button>
+              </div>
             )}
 
-          {/* Acciones de estado */}
-          <div className="flex flex-wrap gap-2">
-            {opciones.map((e) => (
+          {/* Cronómetro del REVISOR + Finalizar revisión (solo gestor) */}
+          {usuario && tarea.estado === "en_revision" && gestor && (
+            <div className="space-y-2">
+              <CronometroTarea
+                tareaId={tarea.id}
+                userId={usuario.id}
+                labelIniciar="Iniciar revisión"
+                refreshKey={cronoKey}
+                onCambio={cargar}
+              />
               <button
-                key={e}
-                onClick={() => accionEstado(e)}
-                className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-slate-50"
+                onClick={() => setConfirmRevision(true)}
+                className="w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 sm:w-auto"
               >
-                {rotuloAccion(e)}
+                Finalizar revisión
               </button>
-            ))}
-            {gestor &&
-              (tarea.estado === "cerrada" || tarea.estado === "cancelada") && (
+            </div>
+          )}
+
+          {/* Ejecutor: la tarea está en revisión (solo lectura) */}
+          {tarea.estado === "en_revision" && !gestor && (
+            <div className="rounded-lg bg-amber-50 px-3 py-2.5 text-sm text-amber-800 ring-1 ring-inset ring-amber-200">
+              Esta tarea está <strong>en revisión</strong>. Un responsable la
+              validará; por ahora no es editable para ti.
+            </div>
+          )}
+
+          {/* Gestión (solo gestor) */}
+          {gestor && (
+            <div className="flex flex-wrap gap-2 border-t border-border pt-3">
+              {(tarea.estado === "cerrada" || tarea.estado === "cancelada") && (
                 <button
                   onClick={reabrir}
                   className="rounded-lg border border-violet-300 bg-violet-50 px-3 py-1.5 text-sm font-medium text-violet-700 hover:bg-violet-100"
@@ -308,15 +410,104 @@ export function TareaDetalle({
                   Reabrir
                 </button>
               )}
-            {gestor && (
+              {["pendiente", "en_proceso", "reabierta"].includes(tarea.estado) && (
+                <button
+                  onClick={() => accionEstado("bloqueada")}
+                  className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-slate-50"
+                >
+                  Bloquear
+                </button>
+              )}
+              {tarea.estado === "bloqueada" && (
+                <button
+                  onClick={() => accionEstado("en_proceso")}
+                  className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-slate-50"
+                >
+                  Desbloquear
+                </button>
+              )}
+              {tarea.estado !== "cerrada" && tarea.estado !== "cancelada" && (
+                <button
+                  onClick={() => accionEstado("cancelada")}
+                  className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50"
+                >
+                  Cancelar
+                </button>
+              )}
               <button
                 onClick={() => setEditando(true)}
                 className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-slate-50"
               >
                 Editar
               </button>
-            )}
-          </div>
+            </div>
+          )}
+
+          {/* Confirmación: Terminar tarea */}
+          {confirmTerminar && (
+            <div className="rounded-xl border border-border bg-surface p-4 shadow-sm">
+              <p className="text-sm font-semibold">¿Quieres finalizar esta tarea?</p>
+              <ul className="mt-2 space-y-1 text-sm text-muted">
+                <li>• Se detendrá definitivamente tu cronómetro.</li>
+                <li>• Dejará de ser editable para ti.</li>
+                <li>
+                  • Pasará a{" "}
+                  {tarea.requiereValidacion ? "En revisión" : "Cerrada"}.
+                </li>
+              </ul>
+              <div className="mt-3 flex justify-end gap-2">
+                <button
+                  onClick={() => setConfirmTerminar(false)}
+                  className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted hover:bg-slate-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={terminar}
+                  disabled={accionando}
+                  className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+                >
+                  Sí, terminar tarea
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Confirmación: Finalizar revisión */}
+          {confirmRevision && (
+            <div className="rounded-xl border border-border bg-surface p-4 shadow-sm">
+              <p className="text-sm font-semibold">Finalizar revisión</p>
+              <textarea
+                value={motivoRev}
+                onChange={(e) => setMotivoRev(e.target.value)}
+                rows={2}
+                placeholder="Nota / motivo (opcional, útil al solicitar correcciones)…"
+                className="mt-2 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
+              />
+              <div className="mt-3 flex flex-wrap justify-end gap-2">
+                <button
+                  onClick={() => setConfirmRevision(false)}
+                  className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted hover:bg-slate-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => finalizarRevision("correcciones")}
+                  disabled={accionando}
+                  className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-700 hover:bg-amber-100 disabled:opacity-50"
+                >
+                  Solicitar correcciones
+                </button>
+                <button
+                  onClick={() => finalizarRevision("aprobar")}
+                  disabled={accionando}
+                  className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+                >
+                  Aprobar y cerrar
+                </button>
+              </div>
+            </div>
+          )}
 
           {error && (
             <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -437,25 +628,6 @@ function TabBtn({
       {children}
     </button>
   );
-}
-
-function rotuloAccion(e: TareaEstado): string {
-  switch (e) {
-    case "en_proceso":
-      return "Iniciar / En proceso";
-    case "en_revision":
-      return "Enviar a revisión";
-    case "cerrada":
-      return "Cerrar";
-    case "bloqueada":
-      return "Bloquear";
-    case "cancelada":
-      return "Cancelar";
-    case "pendiente":
-      return "Volver a pendiente";
-    default:
-      return etiquetaEstado(e);
-  }
 }
 
 function descripcionHistorial(h: TareaHistorial): string {

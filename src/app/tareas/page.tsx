@@ -62,9 +62,14 @@ export default function GestionTareas() {
 
   const visibles = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
+    // Para un ejecutor, "abiertas" excluye En revisión (ya no es suya para
+    // trabajar); un gestor sí ve las de revisión.
+    const abiertasActivas = puedeCrear
+      ? ESTADOS_ABIERTOS
+      : ESTADOS_ABIERTOS.filter((e) => e !== "en_revision");
     return tareas.filter((t) => {
       if (misTareas && t.responsableId !== usuario?.id) return false;
-      if (fEstado === "abiertas" && !ESTADOS_ABIERTOS.includes(t.estado))
+      if (fEstado === "abiertas" && !abiertasActivas.includes(t.estado))
         return false;
       if (
         fEstado !== "abiertas" &&
@@ -98,6 +103,7 @@ export default function GestionTareas() {
     fResponsable,
     busqueda,
     proyectoNombrePorId,
+    puedeCrear,
   ]);
 
   const abiertas = tareas.filter((t) => ESTADOS_ABIERTOS.includes(t.estado));

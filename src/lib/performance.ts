@@ -1,77 +1,76 @@
 "use client";
 
 // Motor de métricas del Dashboard de Performance Gerencial.
-// Deriva indicadores de rendimiento a partir de las marcas de tiempo que ya
-// existen en las tareas (created_at, cerrada_at, estado, deadline, etc.).
-// NO depende del cronómetro por tarea (horas hombre): eso llega después; aquí
-// se deja el hueco preparado (ver horasHombre en el módulo de UI).
+// PRINCIPIO: el tiempo de trabajo se mide SOLO por el cronómetro real
+// (task_time_logs), nunca por tiempo calendario entre creación y cierre.
+// Los indicadores calendario (deadlines, vencidas) sólo alimentan alertas.
 
 import type { Miembro, Tarea, TareaEstado } from "./tasks";
 import { ESTADOS_ABIERTOS } from "./tasks";
+import {
+  calcularHorasHombre,
+  formatHM,
+  tiemposPorTarea,
+  type RegistroTiempo,
+  type TiemposTarea,
+} from "./tiempo";
 
 const DIA = 86_400_000;
 
-// ---------- Utilidades de fecha ----------
-function inicioDeHoy(): number {
-  const n = new Date();
-  return new Date(n.getFullYear(), n.getMonth(), n.getDate()).getTime();
-}
-function inicioDeSemana(): number {
-  const n = new Date();
-  const base = new Date(n.getFullYear(), n.getMonth(), n.getDate());
-  const dow = (base.getDay() + 6) % 7; // lunes = 0
-  base.setDate(base.getDate() - dow);
-  return base.getTime();
-}
-function inicioDeMes(): number {
-  const n = new Date();
-  return new Date(n.getFullYear(), n.getMonth(), 1).getTime();
-}
 function ms(iso: string | null | undefined): number | null {
   if (!iso) return null;
   const t = new Date(iso).getTime();
   return isNaN(t) ? null : t;
 }
-
-/** Formatea una duración en ms a texto legible (min / h / días). */
-export function formatDuracion(msVal: number | null): string {
-  if (msVal === null || msVal === undefined || !isFinite(msVal)) return "—";
-  if (msVal < 0) return "—";
-  const dias = msVal / DIA;
-  if (dias >= 1) return `${dias.toFixed(1)} d`;
-  const horas = msVal / 3_600_000;
-  if (horas >= 1) return `${horas.toFixed(1)} h`;
-  return `${Math.max(1, Math.round(msVal / 60_000))} min`;
+function inicioDeHoy() {
+  const n = new Date();
+  return new Date(n.getFullYear(), n.getMonth(), n.getDate()).getTime();
 }
+function inicioDeSemana() {
+  const n = new Date();
+  const b = new Date(n.getFullYear(), n.getMonth(), n.getDate());
+  b.setDate(b.getDate() - ((b.getDay() + 6) % 7));
+  return b.getTime();
+}
+function inicioDeMes() {
+  const n = new Date();
+  return new Date(n.getFullYear(), n.getMonth(), 1).getTime();
+}
+
+export { formatHM };
 
 // ---------- Tipos de salida ----------
 export interface FilaColaborador {
   id: string;
   nombre: string;
-  cerradasHoy: number;
-  cerradasSemana: number;
+  hoyMs: number;
+  semanaMs: number;
+  mesMs: number;
   cerradasMes: number;
   activas: number;
   enRevision: number;
   pendientes: number;
-  tiempoPromedio: number | null; // ms de resolución promedio
-  cumplimiento: number | null; // % cerradas a tiempo (con deadline)
+  operativoMs: number; // total de su tiempo real
+  tareasConTiempo: number;
+  promedioTareaMs: number | null;
 }
 
-export interface FilaPromedio {
-  clave: string;
+export interface FilaSistema {
   etiqueta: string;
-  n: number;
-  promedio: number | null; // ms
+  operativoMs: number;
+  nTareas: number;
 }
 
-export interface FilaProyecto {
+export interface FilaTarea {
   id: string;
-  nombre: string;
-  abiertas: number;
-  total: number;
-  promedioResolucion: number | null; // ms
-  diasSinActividad: number | null;
+  titulo: string;
+  proyecto: string;
+  sistema: string;
+  ejecutorMs: number;
+  revisorMs: number;
+  totalMs: number;
+  nRevisiones: number;
+  nCorrecciones: number;
 }
 
 export interface Alerta {
@@ -81,164 +80,133 @@ export interface Alerta {
 
 export interface PerformanceData {
   colaboradores: FilaColaborador[];
-  porTipo: FilaPromedio[];
-  porSistema: FilaPromedio[];
-  proyectos: FilaProyecto[];
+  porSistema: FilaSistema[];
+  topTareas: FilaTarea[];
   cuellos: { estado: TareaEstado; label: string; n: number }[];
-  resolucionGlobal: number | null;
-  resolucionPorPrioridad: FilaPromedio[];
   totalAbiertas: number;
-  totalCerradasMes: number;
+  operativoMesMs: number;
+  operativoPromedioTareaMs: number | null;
   vencidas: number;
   alertas: Alerta[];
 }
 
-const LABEL_TIPO: Record<string, string> = {
-  soporte: "Soporte",
-  incidencia: "Incidencia",
-  ajuste: "Ajuste",
-  solicitud: "Solicitud",
-  observacion: "Observación",
-};
-const LABEL_PRIORIDAD: Record<string, string> = {
-  critica: "Crítica",
-  alta: "Alta",
-  normal: "Normal",
-  baja: "Baja",
-};
 const LABEL_ESTADO_CUELLO: Record<string, string> = {
   pendiente: "Pendientes",
   en_revision: "En revisión",
   bloqueada: "Bloqueadas",
 };
 
-/** Promedio de un arreglo de ms (ignora nulos); null si no hay datos. */
-function promedio(valores: (number | null)[]): number | null {
-  const v = valores.filter((x): x is number => x !== null && isFinite(x));
-  if (v.length === 0) return null;
-  return v.reduce((a, b) => a + b, 0) / v.length;
-}
-
-/** Tiempo de resolución de una tarea cerrada (created_at → cerrada_at). */
-function resolucion(t: Tarea): number | null {
-  const c = ms(t.cerradaAt);
-  const ini = ms(t.createdAt);
-  if (c === null || ini === null || c < ini) return null;
-  return c - ini;
-}
-
 export function calcularPerformance(
   tareas: Tarea[],
   miembros: Miembro[],
+  eventos: RegistroTiempo[],
   proyectoNombre: Record<string, string>,
   sistemaNombre: Record<string, string>,
 ): PerformanceData {
   const hoy = inicioDeHoy();
   const semana = inicioDeSemana();
   const mes = inicioDeMes();
-  const ahora = Date.now();
 
-  // ---------- Por colaborador ----------
-  const colaboradores: FilaColaborador[] = miembros.map((m) => {
-    const suyas = tareas.filter((t) => t.responsableId === m.id);
-    const cerradas = suyas.filter((t) => t.estado === "cerrada" && t.cerradaAt);
-    const enRango = (desde: number) =>
-      cerradas.filter((t) => (ms(t.cerradaAt) ?? 0) >= desde).length;
+  const horas = calcularHorasHombre(eventos);
+  const tTarea = tiemposPorTarea(eventos);
+  const tareaPorId = new Map(tareas.map((t) => [t.id, t]));
 
-    const conDeadline = cerradas.filter((t) => t.deadline);
-    const aTiempo = conDeadline.filter(
-      (t) => (ms(t.cerradaAt) ?? 0) <= (ms(t.deadline) ?? 0) + DIA,
-    ).length;
-
-    return {
-      id: m.id,
-      nombre: m.nombre,
-      cerradasHoy: enRango(hoy),
-      cerradasSemana: enRango(semana),
-      cerradasMes: enRango(mes),
-      activas: suyas.filter(
-        (t) => t.estado === "en_proceso" || t.estado === "reabierta",
-      ).length,
-      enRevision: suyas.filter((t) => t.estado === "en_revision").length,
-      pendientes: suyas.filter((t) => t.estado === "pendiente").length,
-      tiempoPromedio: promedio(cerradas.map(resolucion)),
-      cumplimiento:
-        conDeadline.length > 0
-          ? Math.round((aTiempo / conDeadline.length) * 100)
-          : null,
-    };
-  });
-  // Solo mostramos colaboradores con alguna tarea relacionada.
-  const colaboradoresActivos = colaboradores.filter(
-    (c) =>
-      c.cerradasMes + c.activas + c.enRevision + c.pendientes > 0 ||
-      c.tiempoPromedio !== null,
-  );
-
-  // ---------- Promedio por tipo ----------
-  const cerradasAll = tareas.filter((t) => t.estado === "cerrada");
-  const tipos = ["soporte", "incidencia", "ajuste", "solicitud", "observacion"];
-  const porTipo: FilaPromedio[] = tipos
-    .map((tp) => {
-      const grupo = cerradasAll.filter((t) => t.tipo === tp);
-      return {
-        clave: tp,
-        etiqueta: LABEL_TIPO[tp] ?? tp,
-        n: grupo.length,
-        promedio: promedio(grupo.map(resolucion)),
-      };
-    })
-    .filter((f) => f.n > 0)
-    .sort((a, b) => (b.promedio ?? 0) - (a.promedio ?? 0));
-
-  // ---------- Promedio por sistema (por nombre de sistema) ----------
-  const porSistemaMap: Record<string, number[]> = {};
-  for (const t of cerradasAll) {
-    if (!t.sistemaId) continue;
-    const nombre = sistemaNombre[t.sistemaId];
-    if (!nombre) continue;
-    const r = resolucion(t);
-    if (r === null) continue;
-    (porSistemaMap[nombre] ??= []).push(r);
+  // Tiempo operativo por usuario a partir de los eventos (intervalos por
+  // usuario+tarea) y nº de tareas en las que registró tiempo.
+  const opPorUsuario = new Map<string, { ms: number; tareas: Set<string> }>();
+  {
+    const grupos = new Map<string, RegistroTiempo[]>();
+    for (const e of eventos) {
+      if (!e.userId) continue;
+      const k = `${e.userId}::${e.taskId}`;
+      (grupos.get(k) ?? grupos.set(k, []).get(k)!).push(e);
+    }
+    const ahora = Date.now();
+    for (const [k, evs] of grupos) {
+      const [userId, taskId] = k.split("::");
+      let total = 0;
+      let cur: number | null = null;
+      for (const e of evs.sort((a, b) => a.t - b.t)) {
+        if (e.evento === "inicio" || e.evento === "reanudacion") {
+          if (cur === null) cur = e.t;
+        } else if (e.evento === "pausa" || e.evento === "fin") {
+          if (cur !== null) {
+            total += e.t - cur;
+            cur = null;
+          }
+        }
+      }
+      if (cur !== null) total += ahora - cur;
+      const acc = opPorUsuario.get(userId) ?? { ms: 0, tareas: new Set() };
+      acc.ms += total;
+      if (total > 0) acc.tareas.add(taskId);
+      opPorUsuario.set(userId, acc);
+    }
   }
-  const porSistema: FilaPromedio[] = Object.entries(porSistemaMap)
-    .map(([nombre, arr]) => ({
-      clave: nombre,
-      etiqueta: nombre,
-      n: arr.length,
-      promedio: promedio(arr),
-    }))
-    .sort((a, b) => (b.promedio ?? 0) - (a.promedio ?? 0));
 
-  // ---------- Por proyecto ----------
-  const proyIds = Array.from(new Set(tareas.map((t) => t.proyectoId)));
-  const proyectos: FilaProyecto[] = proyIds
-    .map((pid) => {
-      const suyas = tareas.filter((t) => t.proyectoId === pid);
-      const abiertas = suyas.filter((t) =>
-        ESTADOS_ABIERTOS.includes(t.estado),
-      ).length;
-      const ultima = Math.max(
-        0,
-        ...suyas.map((t) => ms(t.updatedAt) ?? ms(t.createdAt) ?? 0),
-      );
+  const colaboradores: FilaColaborador[] = miembros
+    .map((m) => {
+      const suyas = tareas.filter((t) => t.responsableId === m.id);
+      const cerradas = suyas.filter((t) => t.estado === "cerrada" && t.cerradaAt);
+      const h = horas.get(m.id);
+      const op = opPorUsuario.get(m.id);
       return {
-        id: pid,
-        nombre: proyectoNombre[pid] ?? "—",
-        abiertas,
-        total: suyas.length,
-        promedioResolucion: promedio(
-          suyas.filter((t) => t.estado === "cerrada").map(resolucion),
-        ),
-        diasSinActividad:
-          abiertas > 0 && ultima > 0
-            ? Math.floor((ahora - ultima) / DIA)
-            : null,
+        id: m.id,
+        nombre: m.nombre,
+        hoyMs: h?.hoyMs ?? 0,
+        semanaMs: h?.semanaMs ?? 0,
+        mesMs: h?.mesMs ?? 0,
+        cerradasMes: cerradas.filter((t) => (ms(t.cerradaAt) ?? 0) >= mes).length,
+        activas: suyas.filter(
+          (t) => t.estado === "en_proceso" || t.estado === "reabierta",
+        ).length,
+        enRevision: suyas.filter((t) => t.estado === "en_revision").length,
+        pendientes: suyas.filter((t) => t.estado === "pendiente").length,
+        operativoMs: op?.ms ?? 0,
+        tareasConTiempo: op?.tareas.size ?? 0,
+        promedioTareaMs:
+          op && op.tareas.size > 0 ? op.ms / op.tareas.size : null,
       };
     })
-    .sort((a, b) => b.abiertas - a.abiertas);
+    .sort((a, b) => b.mesMs - a.mesMs);
 
-  // ---------- Cuellos de botella ----------
+  // ---------- Por sistema (tiempo operativo) ----------
+  const porSistemaMap = new Map<string, { ms: number; tareas: Set<string> }>();
+  for (const [taskId, tt] of tTarea) {
+    const tarea = tareaPorId.get(taskId);
+    const nombre = tarea?.sistemaId ? sistemaNombre[tarea.sistemaId] : null;
+    const key = nombre ?? "Sin sistema";
+    const acc = porSistemaMap.get(key) ?? { ms: 0, tareas: new Set() };
+    acc.ms += tt.totalMs;
+    acc.tareas.add(taskId);
+    porSistemaMap.set(key, acc);
+  }
+  const porSistema: FilaSistema[] = [...porSistemaMap.entries()]
+    .map(([etiqueta, v]) => ({ etiqueta, operativoMs: v.ms, nTareas: v.tareas.size }))
+    .filter((f) => f.operativoMs > 0)
+    .sort((a, b) => b.operativoMs - a.operativoMs);
+
+  // ---------- Top tareas por tiempo operativo ----------
+  const topTareas: FilaTarea[] = [...tTarea.entries()]
+    .map(([taskId, tt]: [string, TiemposTarea]) => {
+      const tarea = tareaPorId.get(taskId);
+      return {
+        id: taskId,
+        titulo: tarea?.titulo ?? "—",
+        proyecto: tarea ? proyectoNombre[tarea.proyectoId] ?? "—" : "—",
+        sistema: tarea?.sistemaId ? sistemaNombre[tarea.sistemaId] ?? "—" : "—",
+        ejecutorMs: tt.ejecutorMs,
+        revisorMs: tt.revisorMs,
+        totalMs: tt.totalMs,
+        nRevisiones: tt.nRevisiones,
+        nCorrecciones: tt.nCorrecciones,
+      };
+    })
+    .filter((f) => f.totalMs > 0)
+    .sort((a, b) => b.totalMs - a.totalMs)
+    .slice(0, 10);
+
+  // ---------- Cuellos ----------
   const cuellos = (["pendiente", "en_revision", "bloqueada"] as TareaEstado[]).map(
     (e) => ({
       estado: e,
@@ -247,28 +215,20 @@ export function calcularPerformance(
     }),
   );
 
-  // ---------- Resolución global + por prioridad ----------
-  const resolucionGlobal = promedio(cerradasAll.map(resolucion));
-  const prioridades = ["critica", "alta", "normal", "baja"];
-  const resolucionPorPrioridad: FilaPromedio[] = prioridades
-    .map((pr) => {
-      const grupo = cerradasAll.filter((t) => t.prioridad === pr);
-      return {
-        clave: pr,
-        etiqueta: LABEL_PRIORIDAD[pr] ?? pr,
-        n: grupo.length,
-        promedio: promedio(grupo.map(resolucion)),
-      };
-    })
-    .filter((f) => f.n > 0);
-
   // ---------- Totales ----------
   const totalAbiertas = tareas.filter((t) =>
     ESTADOS_ABIERTOS.includes(t.estado),
   ).length;
-  const totalCerradasMes = cerradasAll.filter(
-    (t) => (ms(t.cerradaAt) ?? 0) >= mes,
-  ).length;
+
+  let operativoMesMs = 0;
+  for (const h of horas.values()) operativoMesMs += h.mesMs;
+
+  const conTiempo = [...tTarea.values()].filter((t) => t.totalMs > 0);
+  const operativoPromedioTareaMs =
+    conTiempo.length > 0
+      ? conTiempo.reduce((a, b) => a + b.totalMs, 0) / conTiempo.length
+      : null;
+
   const hoyStr = new Date().toISOString().slice(0, 10);
   const vencidas = tareas.filter(
     (t) =>
@@ -281,16 +241,11 @@ export function calcularPerformance(
   // ---------- Alertas ----------
   const alertas: Alerta[] = [];
   if (vencidas >= 5)
-    alertas.push({
-      nivel: "alta",
-      texto: `${vencidas} tareas vencidas sin cerrar.`,
-    });
+    alertas.push({ nivel: "alta", texto: `${vencidas} tareas vencidas sin cerrar.` });
   else if (vencidas > 0)
     alertas.push({ nivel: "media", texto: `${vencidas} tarea(s) vencida(s).` });
 
-  const enRevisionTotal = tareas.filter(
-    (t) => t.estado === "en_revision",
-  ).length;
+  const enRevisionTotal = tareas.filter((t) => t.estado === "en_revision").length;
   if (enRevisionTotal >= 5)
     alertas.push({
       nivel: "media",
@@ -304,7 +259,7 @@ export function calcularPerformance(
       texto: `${bloqueadas} tarea(s) bloqueada(s).`,
     });
 
-  for (const c of colaboradoresActivos) {
+  for (const c of colaboradores) {
     const carga = c.activas + c.enRevision + c.pendientes;
     if (carga >= 8)
       alertas.push({
@@ -313,31 +268,38 @@ export function calcularPerformance(
       });
   }
 
-  for (const p of proyectos) {
-    if (p.abiertas >= 8)
+  // Proyectos abiertos sin actividad reciente (por updated_at de sus tareas).
+  const ahora = Date.now();
+  const proyIds = Array.from(new Set(tareas.map((t) => t.proyectoId)));
+  for (const pid of proyIds) {
+    const suyas = tareas.filter((t) => t.proyectoId === pid);
+    const abiertas = suyas.filter((t) => ESTADOS_ABIERTOS.includes(t.estado)).length;
+    if (abiertas === 0) continue;
+    const ultima = Math.max(
+      0,
+      ...suyas.map((t) => ms(t.updatedAt) ?? ms(t.createdAt) ?? 0),
+    );
+    const dias = ultima > 0 ? Math.floor((ahora - ultima) / DIA) : 0;
+    if (abiertas >= 8)
       alertas.push({
         nivel: "media",
-        texto: `${p.nombre}: ${p.abiertas} tareas abiertas.`,
+        texto: `${proyectoNombre[pid] ?? "Proyecto"}: ${abiertas} tareas abiertas.`,
       });
-    if (p.diasSinActividad !== null && p.diasSinActividad >= 7)
+    if (dias >= 7)
       alertas.push({
         nivel: "alta",
-        texto: `${p.nombre}: sin actividad hace ${p.diasSinActividad} días.`,
+        texto: `${proyectoNombre[pid] ?? "Proyecto"}: sin actividad hace ${dias} días.`,
       });
   }
 
   return {
-    colaboradores: colaboradoresActivos.sort(
-      (a, b) => b.cerradasMes - a.cerradasMes,
-    ),
-    porTipo,
+    colaboradores,
     porSistema,
-    proyectos,
+    topTareas,
     cuellos,
-    resolucionGlobal,
-    resolucionPorPrioridad,
     totalAbiertas,
-    totalCerradasMes,
+    operativoMesMs,
+    operativoPromedioTareaMs,
     vencidas,
     alertas,
   };
