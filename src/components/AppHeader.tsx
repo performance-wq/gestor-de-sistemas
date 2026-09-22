@@ -9,6 +9,7 @@ import { NotificacionesMenu } from "./NotificacionesMenu";
 
 const NAV = [
   { href: "/tablero", label: "Tablero", match: ["/tablero"], soloGestor: true },
+  { href: "/performance", label: "Performance", match: ["/performance"], soloGestor: true },
   { href: "/dashboard", label: "Proyectos", match: ["/dashboard", "/proyecto"], soloGestor: false },
   { href: "/tareas", label: "Gestión de tareas", match: ["/tareas"], soloGestor: false },
 ];
