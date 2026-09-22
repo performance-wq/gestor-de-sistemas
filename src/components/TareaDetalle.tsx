@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Modal } from "./Modal";
 import { VisorMedia } from "./VisorMedia";
+import { CronometroTarea } from "./CronometroTarea";
 import { useStore } from "@/lib/store";
 import { etiquetaRol } from "@/lib/roles";
 import { subirAsset, urlFirmada } from "@/lib/storage";
@@ -279,6 +280,13 @@ export function TareaDetalle({
                 : undefined
             }
           />
+
+          {/* Cronómetro de trabajo (registra horas hombre) */}
+          {usuario &&
+            tarea.estado !== "cerrada" &&
+            tarea.estado !== "cancelada" && (
+              <CronometroTarea tareaId={tarea.id} userId={usuario.id} />
+            )}
 
           {/* Acciones de estado */}
           <div className="flex flex-wrap gap-2">

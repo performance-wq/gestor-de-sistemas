@@ -7,8 +7,13 @@ import { esGestor, listarMiembros, listarTareas, type Miembro, type Tarea } from
 import {
   calcularPerformance,
   formatDuracion,
-  type FilaColaborador,
 } from "@/lib/performance";
+import {
+  calcularHorasHombre,
+  formatHM,
+  listarEventosTiempo,
+  type RegistroTiempo,
+} from "@/lib/tiempo";
 
 // Dashboard de Performance Gerencial (independiente del Tablero operativo).
 // Solo gestores. Mide productividad, tiempos, carga, cuellos y alertas a
@@ -19,6 +24,7 @@ export default function Performance() {
   const router = useRouter();
   const [tareas, setTareas] = useState<Tarea[]>([]);
   const [miembros, setMiembros] = useState<Miembro[]>([]);
+  const [eventos, setEventos] = useState<RegistroTiempo[]>([]);
   const [cargando, setCargando] = useState(true);
 
   const permitido = esGestor(usuario?.rol);
@@ -33,7 +39,10 @@ export default function Performance() {
       setCargando(false);
     });
     listarMiembros().then(setMiembros);
+    listarEventosTiempo().then(setEventos);
   }, [permitido]);
+
+  const horas = useMemo(() => calcularHorasHombre(eventos), [eventos]);
 
   const proyectoNombre = useMemo(() => {
     const m: Record<string, string> = {};
@@ -121,39 +130,38 @@ export default function Performance() {
           )}
 
           <div className="mt-6 grid gap-6 lg:grid-cols-2">
-            {/* 1. Horas hombre (preparado) */}
-            <Panel
-              titulo="Horas hombre"
-              nota="Próxima etapa: requiere el cronómetro por tarea"
-            >
-              <div className="overflow-hidden rounded-lg border border-dashed border-border">
+            {/* 1. Horas hombre (cronómetro real) */}
+            <Panel titulo="Horas hombre" nota="Tiempo efectivo registrado por tarea">
+              {miembros.length === 0 ? (
+                <Vacio />
+              ) : (
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-slate-50 text-xs text-muted">
-                      <th className="px-3 py-2 text-left font-medium">Colaborador</th>
-                      <th className="px-3 py-2 text-right font-medium">Hoy</th>
-                      <th className="px-3 py-2 text-right font-medium">Semana</th>
-                      <th className="px-3 py-2 text-right font-medium">Mes</th>
+                    <tr className="text-xs text-muted">
+                      <th className="py-1.5 text-left font-medium">Colaborador</th>
+                      <th className="py-1.5 text-right font-medium">Hoy</th>
+                      <th className="py-1.5 text-right font-medium">Semana</th>
+                      <th className="py-1.5 text-right font-medium">Mes</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {(data.colaboradores.length
-                      ? data.colaboradores
-                      : miembros.map((m) => ({ id: m.id, nombre: m.nombre } as FilaColaborador))
-                    ).map((c) => (
-                      <tr key={c.id} className="border-t border-border">
-                        <td className="px-3 py-2">{c.nombre}</td>
-                        <td className="px-3 py-2 text-right text-muted">—</td>
-                        <td className="px-3 py-2 text-right text-muted">—</td>
-                        <td className="px-3 py-2 text-right text-muted">—</td>
-                      </tr>
-                    ))}
+                    {miembros.map((m) => {
+                      const h = horas.get(m.id);
+                      return (
+                        <tr key={m.id} className="border-t border-border">
+                          <td className="py-2">{m.nombre}</td>
+                          <td className="py-2 text-right tabular-nums">{formatHM(h?.hoyMs ?? 0)}</td>
+                          <td className="py-2 text-right tabular-nums">{formatHM(h?.semanaMs ?? 0)}</td>
+                          <td className="py-2 text-right font-semibold tabular-nums">{formatHM(h?.mesMs ?? 0)}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
-              </div>
+              )}
               <p className="mt-2 text-xs text-muted">
-                Cuando se active el registro de tiempo (inicio · pausa ·
-                reanudación · fin) esta tabla se llenará automáticamente.
+                Se acumula desde el cronómetro (Iniciar · Pausar · Reanudar ·
+                Finalizar) en el detalle de cada tarea.
               </p>
             </Panel>
 
