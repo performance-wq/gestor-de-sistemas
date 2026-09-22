@@ -8,6 +8,7 @@ import { createClient } from "./supabase/client";
 
 // ---------- Catálogos ----------
 export type TareaTipo =
+  | "implementacion"
   | "soporte"
   | "incidencia"
   | "ajuste"
@@ -24,6 +25,7 @@ export type TareaEstado =
   | "cancelada";
 
 export const TIPOS: { valor: TareaTipo; label: string }[] = [
+  { valor: "implementacion", label: "Implementación" },
   { valor: "soporte", label: "Soporte" },
   { valor: "incidencia", label: "Incidencia" },
   { valor: "ajuste", label: "Ajuste" },
