@@ -249,6 +249,7 @@ export function OnboardingPanel({
           respuestas={row.respuestas ?? {}}
           version={version}
           onboardingId={row.id}
+          token={row.token}
           onReiniciado={cargar}
           onActualizado={cargar}
           onAviso={setToast}

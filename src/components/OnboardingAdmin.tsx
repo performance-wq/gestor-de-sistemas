@@ -8,7 +8,12 @@ import {
   type Edicion,
 } from "./OnboardingRespuestas";
 import { descargarOnboardingZip } from "@/lib/onboarding-export";
-import type { Respuestas } from "@/lib/onboarding-schema";
+import { subirAsset } from "@/lib/storage";
+import type {
+  ArchivoSubido,
+  Respuesta,
+  Respuestas,
+} from "@/lib/onboarding-schema";
 import { formatFechaHora } from "@/lib/ui";
 
 export interface Version {
@@ -33,6 +38,7 @@ export function OnboardingAdmin({
   respuestas,
   version = 1,
   onboardingId,
+  token,
   onReiniciado,
   onActualizado,
   onAviso,
@@ -46,6 +52,7 @@ export function OnboardingAdmin({
   respuestas: Respuestas;
   version?: number;
   onboardingId: string;
+  token: string;
   onReiniciado: () => void;
   onActualizado?: () => void;
   onAviso: (m: string) => void;
@@ -108,13 +115,13 @@ export function OnboardingAdmin({
 
   async function editarRespuesta(
     preguntaId: string,
-    valor: string,
+    valor: Respuesta,
   ): Promise<boolean> {
     const { data, error } = await supabase.rpc("onboarding_editar_respuesta", {
       p_proyecto: proyectoId,
       p_version: version,
       p_pregunta: preguntaId,
-      p_valor: valor,
+      p_valor: valor ?? null,
     });
     if (error) {
       onAviso("No se pudo guardar: " + error.message);
@@ -125,6 +132,15 @@ export function OnboardingAdmin({
     onActualizado?.();
     onAviso("Respuesta actualizada");
     return true;
+  }
+
+  async function subirArchivoOnb(
+    preguntaId: string,
+    file: File,
+  ): Promise<ArchivoSubido | null> {
+    const path = await subirAsset(file, `onboarding/${token}/${preguntaId}`);
+    if (!path) return null;
+    return { path, nombre: file.name, tipo: file.type || "" };
   }
 
   async function reiniciar() {
@@ -192,6 +208,7 @@ export function OnboardingAdmin({
                 version={version}
                 editable
                 onGuardar={editarRespuesta}
+                onSubirArchivo={subirArchivoOnb}
                 ediciones={ediciones}
               />
             </div>

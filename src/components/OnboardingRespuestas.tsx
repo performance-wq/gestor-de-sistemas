@@ -1,14 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArchivoPreview } from "./ArchivoPreview";
 import { formatFechaHora } from "@/lib/ui";
 import {
   seccionesDe,
   esTipoArchivo,
+  acceptDe,
+  MAX_MB,
   type ArchivoSubido,
   type Par,
   type Pregunta,
+  type Respuesta,
   type Respuestas,
   type TipoCampo,
 } from "@/lib/onboarding-schema";
@@ -30,24 +33,51 @@ export interface Edicion {
 }
 
 // Tipos de respuesta que se pueden editar como texto desde el panel.
-const TIPOS_EDITABLES: TipoCampo[] = ["texto", "textarea", "url", "email", "tel"];
-const esEditableTipo = (t: TipoCampo) => TIPOS_EDITABLES.includes(t);
+const TIPOS_TEXTO_EDITABLES: TipoCampo[] = [
+  "texto",
+  "textarea",
+  "url",
+  "email",
+  "tel",
+];
+const esTextoEditable = (t: TipoCampo) => TIPOS_TEXTO_EDITABLES.includes(t);
+
+function etiquetaArchivo(t: TipoCampo): string {
+  switch (t) {
+    case "imagenes":
+      return "imágenes";
+    case "videos":
+      return "videos";
+    case "media":
+      return "imágenes o videos";
+    default:
+      return "archivos";
+  }
+}
 
 // Muestra las respuestas del cliente en las 5 secciones del formulario,
 // cada una expandible/contraíble. Reutilizado en la vista previa (modal).
-// Con `editable`, cada respuesta de texto puede corregirse (con confirmación).
+// Con `editable`, las respuestas de texto pueden corregirse y, si se pasa
+// `onSubirArchivo`, también se pueden editar imágenes/videos/documentos
+// (agregar y quitar) — todo con confirmación.
 export function OnboardingRespuestas({
   respuestas,
   version = 1,
   editable = false,
   onGuardar,
+  onSubirArchivo,
   ediciones,
 }: {
   respuestas: Respuestas;
   version?: number;
   editable?: boolean;
-  /** Guarda una respuesta editada. Devuelve true si se guardó. */
-  onGuardar?: (preguntaId: string, valor: string) => Promise<boolean>;
+  /** Guarda una respuesta editada (texto o lista de archivos). true si se guardó. */
+  onGuardar?: (preguntaId: string, valor: Respuesta) => Promise<boolean>;
+  /** Sube un archivo y devuelve su descriptor (para editar imágenes/videos). */
+  onSubirArchivo?: (
+    preguntaId: string,
+    file: File,
+  ) => Promise<ArchivoSubido | null>;
   /** Historial de ediciones por pregunta. */
   ediciones?: Record<string, Edicion[]>;
 }) {
@@ -89,6 +119,7 @@ export function OnboardingRespuestas({
                     valor={respuestas[p.id]}
                     editable={editable}
                     onGuardar={onGuardar}
+                    onSubirArchivo={onSubirArchivo}
                     ediciones={ediciones?.[p.id]}
                   />
                 ))}
@@ -106,21 +137,33 @@ function RespuestaVista({
   valor,
   editable,
   onGuardar,
+  onSubirArchivo,
   ediciones,
 }: {
   pregunta: Pregunta;
   valor: unknown;
   editable?: boolean;
-  onGuardar?: (preguntaId: string, valor: string) => Promise<boolean>;
+  onGuardar?: (preguntaId: string, valor: Respuesta) => Promise<boolean>;
+  onSubirArchivo?: (
+    preguntaId: string,
+    file: File,
+  ) => Promise<ArchivoSubido | null>;
   ediciones?: Edicion[];
 }) {
   const vacio = !tieneValor(valor);
-  const puedeEditar = !!editable && !!onGuardar && esEditableTipo(pregunta.tipo);
+  const esArchivo = esTipoArchivo(pregunta.tipo);
+  const puedeEditar =
+    !!editable &&
+    !!onGuardar &&
+    (esTextoEditable(pregunta.tipo) || (esArchivo && !!onSubirArchivo));
 
   const [modo, setModo] = useState<"ver" | "editar" | "confirmar">("ver");
   const [borrador, setBorrador] = useState("");
+  const [archivos, setArchivos] = useState<ArchivoSubido[]>([]);
+  const [subiendo, setSubiendo] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   // Si cambian las respuestas desde fuera, volvemos a modo lectura.
   useEffect(() => {
@@ -128,18 +171,45 @@ function RespuestaVista({
   }, [valor]);
 
   const ultima = ediciones && ediciones.length > 0 ? ediciones[0] : null;
+  const maxArchivos = pregunta.cantidad ?? pregunta.maximo ?? 10;
+  const maxMb = pregunta.maxMb ?? MAX_MB;
 
   function iniciarEdicion() {
-    setBorrador(typeof valor === "string" ? valor : "");
+    if (esArchivo) {
+      setArchivos(Array.isArray(valor) ? ([...valor] as ArchivoSubido[]) : []);
+    } else {
+      setBorrador(typeof valor === "string" ? valor : "");
+    }
     setError(null);
     setModo("editar");
+  }
+
+  async function onFiles(lista: FileList | null) {
+    if (!lista?.length || !onSubirArchivo) return;
+    setError(null);
+    const espacio = maxArchivos - archivos.length;
+    const nuevos: ArchivoSubido[] = [];
+    for (const file of Array.from(lista).slice(0, espacio)) {
+      if (file.size > maxMb * 1024 * 1024) {
+        setError(`"${file.name}" pesa más de ${maxMb} MB.`);
+        continue;
+      }
+      setSubiendo(file.name);
+      const sub = await onSubirArchivo(pregunta.id, file);
+      if (sub) nuevos.push(sub);
+      else setError(`No se pudo subir "${file.name}".`);
+    }
+    setSubiendo(null);
+    if (fileRef.current) fileRef.current.value = "";
+    if (nuevos.length) setArchivos((a) => [...a, ...nuevos]);
   }
 
   async function confirmarGuardado() {
     if (!onGuardar) return;
     setGuardando(true);
     setError(null);
-    const ok = await onGuardar(pregunta.id, borrador.trim());
+    const valorNuevo: Respuesta = esArchivo ? archivos : borrador.trim();
+    const ok = await onGuardar(pregunta.id, valorNuevo);
     setGuardando(false);
     if (ok) setModo("ver");
     else {
@@ -147,6 +217,8 @@ function RespuestaVista({
       setModo("editar");
     }
   }
+
+  const bloqueado = modo === "confirmar" || guardando;
 
   return (
     <div className="px-4 py-3.5">
@@ -165,19 +237,76 @@ function RespuestaVista({
       {/* Modo edición / confirmación */}
       {modo !== "ver" ? (
         <div className="mt-2">
-          {pregunta.tipo === "textarea" ? (
+          {esArchivo ? (
+            <div>
+              {archivos.length > 0 ? (
+                <div
+                  className={
+                    pregunta.tipo === "documentos"
+                      ? "space-y-2"
+                      : "grid grid-cols-2 gap-2 sm:grid-cols-3"
+                  }
+                >
+                  {archivos.map((a, i) => (
+                    <div key={a.path} className="relative">
+                      <ArchivoPreview archivo={a} />
+                      {!bloqueado && (
+                        <button
+                          onClick={() =>
+                            setArchivos((arr) => arr.filter((_, j) => j !== i))
+                          }
+                          title="Quitar archivo"
+                          className="absolute right-1 top-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-xs font-bold text-white shadow hover:bg-red-700"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm italic text-slate-400">Sin archivos</p>
+              )}
+
+              {!bloqueado && archivos.length < maxArchivos && (
+                <div className="mt-2">
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    multiple={maxArchivos > 1}
+                    accept={acceptDe(pregunta.tipo)}
+                    onChange={(e) => onFiles(e.target.files)}
+                    className="hidden"
+                    id={`edit-file-${pregunta.id}`}
+                  />
+                  <label
+                    htmlFor={`edit-file-${pregunta.id}`}
+                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-dashed border-accent/40 bg-accent/5 px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent/10"
+                  >
+                    📎 Agregar {etiquetaArchivo(pregunta.tipo)}
+                  </label>
+                  <span className="ml-2 text-xs text-muted">
+                    máx. {maxMb} MB · {archivos.length}/{maxArchivos}
+                  </span>
+                </div>
+              )}
+              {subiendo && (
+                <p className="mt-1.5 text-xs text-muted">Subiendo {subiendo}…</p>
+              )}
+            </div>
+          ) : pregunta.tipo === "textarea" ? (
             <textarea
               value={borrador}
               onChange={(e) => setBorrador(e.target.value)}
               rows={5}
-              disabled={modo === "confirmar" || guardando}
+              disabled={bloqueado}
               className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-60"
             />
           ) : (
             <input
               value={borrador}
               onChange={(e) => setBorrador(e.target.value)}
-              disabled={modo === "confirmar" || guardando}
+              disabled={bloqueado}
               className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-60"
             />
           )}
@@ -194,7 +323,8 @@ function RespuestaVista({
               </button>
               <button
                 onClick={() => setModo("confirmar")}
-                className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90"
+                disabled={!!subiendo}
+                className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
               >
                 Guardar cambios
               </button>
@@ -227,7 +357,7 @@ function RespuestaVista({
         <div className="mt-1.5 text-sm text-muted">
           {vacio ? (
             <span className="italic text-slate-400">Sin responder</span>
-          ) : esTipoArchivo(pregunta.tipo) ? (
+          ) : esArchivo ? (
             <div
               className={
                 pregunta.tipo === "documentos"
