@@ -1,6 +1,6 @@
 "use client";
 
-import { formatFecha } from "@/lib/ui";
+import { avatarColor, formatFecha, inicial } from "@/lib/ui";
 import {
   chipEstado,
   chipPrioridad,
@@ -43,6 +43,13 @@ export function ListaTareas({
           t.deadline < hoy &&
           t.estado !== "cerrada" &&
           t.estado !== "cancelada";
+        const responsable = t.responsableId
+          ? nombrePorId[t.responsableId]
+          : undefined;
+        const empresa =
+          mostrarProyecto && proyectoNombrePorId
+            ? proyectoNombrePorId[t.proyectoId] ?? "—"
+            : undefined;
         return (
           <button
             key={t.id}
@@ -51,9 +58,33 @@ export function ListaTareas({
               i > 0 ? "border-t border-border" : ""
             }`}
           >
+            {/* Avatar del responsable */}
+            <span
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold ${avatarColor(
+                responsable,
+              )}`}
+              title={responsable ?? "Sin asignar"}
+            >
+              {inicial(responsable)}
+            </span>
+
             <div className="min-w-0 flex-1">
+              {/* Responsable primero, luego empresa */}
               <div className="flex items-center gap-2">
-                <span className="truncate text-sm font-medium">{t.titulo}</span>
+                <span className="truncate text-sm font-semibold text-foreground">
+                  {responsable ?? "Sin asignar"}
+                </span>
+                {empresa && (
+                  <span className="truncate text-xs text-muted">
+                    · 🏢 {empresa}
+                  </span>
+                )}
+              </div>
+              {/* Título */}
+              <div className="mt-0.5 flex items-center gap-2">
+                <span className="truncate text-sm text-foreground/90">
+                  {t.titulo}
+                </span>
                 {t.reabiertaCount > 0 && (
                   <span className="shrink-0 text-xs text-violet-600">
                     ↻{t.reabiertaCount}
@@ -61,18 +92,12 @@ export function ListaTareas({
                 )}
               </div>
               <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted">
-                {mostrarProyecto && proyectoNombrePorId && (
-                  <span className="truncate">
-                    {proyectoNombrePorId[t.proyectoId] ?? "—"}
-                  </span>
-                )}
-                <span>· {etiquetaTipo(t.tipo)}</span>
-                {t.responsableId && (
-                  <span>· {nombrePorId[t.responsableId] ?? "—"}</span>
-                )}
+                <span className="rounded bg-slate-100 px-1.5 py-0.5 font-medium">
+                  {etiquetaTipo(t.tipo)}
+                </span>
                 {t.deadline && (
                   <span className={vencida ? "font-medium text-red-600" : ""}>
-                    · {formatFecha(t.deadline)}
+                    📅 {formatFecha(t.deadline)}
                     {vencida ? " (vencida)" : ""}
                   </span>
                 )}

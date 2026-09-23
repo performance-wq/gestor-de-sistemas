@@ -15,10 +15,12 @@ import {
   type TareaEstado,
 } from "@/lib/tasks";
 import { ListaTareas } from "@/components/ListaTareas";
+import { TableroTareas } from "@/components/TableroTareas";
 import { NuevaTareaModal } from "@/components/NuevaTareaModal";
 import { TareaDetalle } from "@/components/TareaDetalle";
 
 type FiltroEstado = TareaEstado | "abiertas" | "todas";
+type Vista = "lista" | "tablero";
 
 export default function GestionTareas() {
   const { usuario, proyectos } = useStore();
@@ -35,7 +37,22 @@ export default function GestionTareas() {
 
   const [nueva, setNueva] = useState(false);
   const [detalle, setDetalle] = useState<string | null>(null);
+  const [vista, setVista] = useState<Vista>("lista");
   const puedeCrear = esGestor(usuario?.rol);
+
+  // Recuerda la vista preferida por navegador.
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem("pex_vista_tareas");
+      if (v === "tablero" || v === "lista") setVista(v);
+    } catch {}
+  }, []);
+  function cambiarVista(v: Vista) {
+    setVista(v);
+    try {
+      localStorage.setItem("pex_vista_tareas", v);
+    } catch {}
+  }
 
   const cargar = useCallback(async () => {
     const t = await listarTareas();
@@ -210,10 +227,46 @@ export default function GestionTareas() {
         </select>
       </div>
 
-      {/* Lista */}
-      <div className="mt-6">
+      {/* Toggle de vista */}
+      <div className="mt-5 flex items-center justify-between gap-3">
+        <span className="text-xs text-muted">
+          {visibles.length} tarea{visibles.length === 1 ? "" : "s"}
+        </span>
+        <div className="inline-flex rounded-lg border border-border bg-surface p-0.5">
+          <button
+            onClick={() => cambiarVista("lista")}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+              vista === "lista"
+                ? "bg-accent text-white"
+                : "text-muted hover:text-foreground"
+            }`}
+          >
+            ☰ Lista
+          </button>
+          <button
+            onClick={() => cambiarVista("tablero")}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+              vista === "tablero"
+                ? "bg-accent text-white"
+                : "text-muted hover:text-foreground"
+            }`}
+          >
+            ▦ Tablero
+          </button>
+        </div>
+      </div>
+
+      {/* Lista / Tablero */}
+      <div className="mt-4">
         {cargando ? (
           <div className="py-20 text-center text-sm text-muted">Cargando…</div>
+        ) : vista === "tablero" ? (
+          <TableroTareas
+            tareas={visibles}
+            nombrePorId={nombrePorId}
+            proyectoNombrePorId={proyectoNombrePorId}
+            onOpen={(id) => setDetalle(id)}
+          />
         ) : (
           <ListaTareas
             tareas={visibles}
