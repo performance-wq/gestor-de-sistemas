@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Modal } from "./Modal";
-import { OnboardingRespuestas } from "./OnboardingRespuestas";
+import {
+  OnboardingRespuestas,
+  type Edicion,
+} from "./OnboardingRespuestas";
 import { descargarOnboardingZip } from "@/lib/onboarding-export";
 import type { Respuestas } from "@/lib/onboarding-schema";
 import { formatFechaHora } from "@/lib/ui";
@@ -31,6 +34,7 @@ export function OnboardingAdmin({
   version = 1,
   onboardingId,
   onReiniciado,
+  onActualizado,
   onAviso,
 }: {
   abierto: boolean;
@@ -43,6 +47,7 @@ export function OnboardingAdmin({
   version?: number;
   onboardingId: string;
   onReiniciado: () => void;
+  onActualizado?: () => void;
   onAviso: (m: string) => void;
 }) {
   const supabase = createClient();
@@ -51,6 +56,15 @@ export function OnboardingAdmin({
   const [confirmacion, setConfirmacion] = useState("");
   const [reiniciando, setReiniciando] = useState(false);
   const [verVersion, setVerVersion] = useState<Version | null>(null);
+
+  // Copia local de las respuestas (para reflejar ediciones al instante)
+  // y el historial de ediciones manuales por pregunta.
+  const [resp, setResp] = useState<Respuestas>(respuestas ?? {});
+  const [ediciones, setEdiciones] = useState<Record<string, Edicion[]>>({});
+
+  useEffect(() => {
+    setResp(respuestas ?? {});
+  }, [respuestas]);
 
   const cargarVersiones = useCallback(async () => {
     setCargando(true);
@@ -65,15 +79,53 @@ export function OnboardingAdmin({
     setCargando(false);
   }, [supabase, onboardingId]);
 
+  const cargarEdiciones = useCallback(async () => {
+    const { data } = await supabase
+      .from("onboarding_ediciones")
+      .select(
+        "pregunta_id, valor_anterior, valor_nuevo, editado_por_nombre, editado_en",
+      )
+      .eq("onboarding_id", onboardingId)
+      .order("editado_en", { ascending: false });
+    const map: Record<string, Edicion[]> = {};
+    for (const e of (data as Edicion[]) ?? []) {
+      (map[e.pregunta_id] ??= []).push(e);
+    }
+    setEdiciones(map);
+  }, [supabase, onboardingId]);
+
   useEffect(() => {
     if (abierto) {
       cargarVersiones();
+      cargarEdiciones();
       setConfirmacion("");
     }
-  }, [abierto, cargarVersiones]);
+  }, [abierto, cargarVersiones, cargarEdiciones]);
 
-  const nRespuestas = Object.keys(respuestas ?? {}).length;
+  const nRespuestas = Object.keys(resp ?? {}).length;
+  const tieneRespuestas = nRespuestas > 0;
   const puedeReiniciar = confirmacion.trim() === PALABRA && !reiniciando;
+
+  async function editarRespuesta(
+    preguntaId: string,
+    valor: string,
+  ): Promise<boolean> {
+    const { data, error } = await supabase.rpc("onboarding_editar_respuesta", {
+      p_proyecto: proyectoId,
+      p_version: version,
+      p_pregunta: preguntaId,
+      p_valor: valor,
+    });
+    if (error) {
+      onAviso("No se pudo guardar: " + error.message);
+      return false;
+    }
+    if (data) setResp(data as Respuestas);
+    await cargarEdiciones();
+    onActualizado?.();
+    onAviso("Respuesta actualizada");
+    return true;
+  }
 
   async function reiniciar() {
     if (!puedeReiniciar) return;
@@ -125,6 +177,26 @@ export function OnboardingAdmin({
               : "Sin respuestas todavía."}
           </p>
         </div>
+
+        {/* Respuestas recibidas (editables) */}
+        {tieneRespuestas && (
+          <div className="mt-5">
+            <h3 className="font-medium">Respuestas recibidas</h3>
+            <p className="mt-0.5 text-sm text-muted">
+              Puedes corregir o completar una respuesta de texto. Cada cambio
+              queda registrado (quién y cuándo) y el valor anterior se conserva.
+            </p>
+            <div className="mt-3">
+              <OnboardingRespuestas
+                respuestas={resp}
+                version={version}
+                editable
+                onGuardar={editarRespuesta}
+                ediciones={ediciones}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Historial */}
         <div className="mt-5">

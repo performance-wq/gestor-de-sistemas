@@ -29,6 +29,8 @@ export interface Pregunta {
   cantidad?: number;
   /** Máximo permitido de archivos (tope, sin exigir una cantidad exacta). */
   maximo?: number;
+  /** Tamaño máximo por archivo en MB (si no, se usa MAX_MB global). */
+  maxMb?: number;
   placeholder?: string;
 }
 
@@ -241,7 +243,7 @@ export const SECCIONES_V2: SeccionOnboarding[] = [
       "Comparte el mejor contenido disponible de tu negocio. Puedes incluir testimonios, casos de éxito, antes y después, recorrido por el negocio, productos, servicios, instalaciones, cómo llegar o cualquier material que represente bien tu operación.",
     preguntas: [
       { id: "v2_imagenes", titulo: "Sube hasta 5 imágenes de tu negocio", tipo: "imagenes", maximo: 5, ayuda: "El mejor material disponible: testimonios, productos, instalaciones, antes y después, etc." },
-      { id: "v2_videos", titulo: "Sube hasta 5 videos de tu negocio", tipo: "videos", maximo: 5, opcional: true, ayuda: "Testimonios, casos de éxito, recorrido por el negocio, etc." },
+      { id: "v2_videos", titulo: "Sube hasta 5 videos de tu negocio", tipo: "videos", maximo: 5, maxMb: 500, opcional: true, ayuda: "Testimonios, casos de éxito, recorrido por el negocio, etc." },
       { id: "v2_logo", titulo: "Sube el logo de tu negocio", tipo: "imagenes", cantidad: 1 },
     ],
   },

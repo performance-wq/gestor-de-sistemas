@@ -250,6 +250,7 @@ export function OnboardingPanel({
           version={version}
           onboardingId={row.id}
           onReiniciado={cargar}
+          onActualizado={cargar}
           onAviso={setToast}
         />
       )}

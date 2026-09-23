@@ -181,6 +181,7 @@ export function CampoOnboarding({
   if (esTipoArchivo(pregunta.tipo)) {
     const archivos = (valor as ArchivoSubido[]) ?? [];
     const limite = pregunta.cantidad ?? pregunta.maximo ?? 10;
+    const maxMb = pregunta.maxMb ?? MAX_MB;
     const lleno = archivos.length >= limite;
 
     async function onFiles(lista: FileList | null) {
@@ -196,9 +197,9 @@ export function CampoOnboarding({
           );
           continue;
         }
-        if (file.size > MAX_MB * 1024 * 1024) {
+        if (file.size > maxMb * 1024 * 1024) {
           setErrorArchivo(
-            `"${file.name}" pesa más de ${MAX_MB} MB. Súbelo más ligero.`,
+            `"${file.name}" pesa más de ${maxMb} MB. Súbelo más ligero.`,
           );
           continue;
         }
@@ -247,7 +248,7 @@ export function CampoOnboarding({
               : "Haz clic para subir tus archivos"}
           </span>
           <span className="mt-1 text-xs text-muted">
-            {etiquetaTipo(pregunta)} · máximo {MAX_MB} MB por archivo
+            {etiquetaTipo(pregunta)} · máximo {maxMb} MB por archivo
             {pregunta.cantidad
               ? ` · ${archivos.length} de ${pregunta.cantidad}`
               : pregunta.maximo
