@@ -231,19 +231,25 @@ export function NuevaTareaModal({
         {/* Responsable + Deadline */}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1 block text-sm font-medium">Responsable</label>
+            <label className="mb-1 block text-sm font-medium">
+              Responsable{" "}
+              <span className="font-normal text-muted">(opcional)</span>
+            </label>
             <select
               value={responsableId}
               onChange={(e) => setResponsableId(e.target.value)}
               className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
             >
-              <option value="">Sin asignar</option>
+              <option value="">Sin asignar (por iniciativa)</option>
               {miembros.map((m) => (
                 <option key={m.id} value={m.id}>
                   {m.nombre}
                 </option>
               ))}
             </select>
+            <p className="mt-1 text-xs text-muted">
+              Déjala sin asignar para que el equipo la tome por iniciativa.
+            </p>
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium">Fecha límite</label>

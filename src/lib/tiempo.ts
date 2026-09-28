@@ -75,11 +75,27 @@ export async function registrarTiempo(
   if (error) throw new Error(error.message);
 }
 
-// El ejecutor termina su trabajo → En revisión o Cerrada.
-export async function terminarTarea(taskId: string): Promise<string> {
+// Tomar una tarea por iniciativa: valida el código personal, asigna al
+// usuario, la pasa a En proceso y arranca el cronómetro. Atómico (evita
+// que dos personas la tomen a la vez).
+export async function tomarTarea(taskId: string, codigo: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.rpc("task_tomar", {
+    p_task_id: taskId,
+    p_codigo: codigo,
+  });
+  if (error) throw new Error(error.message);
+}
+
+// El ejecutor entrega su trabajo (exige el código personal) → En revisión o Cerrada.
+export async function terminarTarea(
+  taskId: string,
+  codigo: string,
+): Promise<string> {
   const supabase = createClient();
   const { data, error } = await supabase.rpc("tarea_terminar", {
     p_task_id: taskId,
+    p_codigo: codigo,
   });
   if (error) throw new Error(error.message);
   return (data as string) ?? "";

@@ -1,14 +1,17 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useStore } from "@/lib/store";
 import { createClient } from "@/lib/supabase/client";
 import { etiquetaRol } from "@/lib/roles";
+import { MiCodigoModal } from "./MiCodigoModal";
 
 export function UserMenu() {
   const { usuario } = useStore();
   const router = useRouter();
+  const [codigoAbierto, setCodigoAbierto] = useState(false);
 
   if (!usuario) return null;
 
@@ -24,6 +27,14 @@ export function UserMenu() {
 
   return (
     <div className="flex items-center gap-3">
+      {codigoAbierto && <MiCodigoModal onClose={() => setCodigoAbierto(false)} />}
+      <button
+        onClick={() => setCodigoAbierto(true)}
+        className="hidden rounded-lg px-3 py-1.5 text-sm font-medium text-muted transition-colors hover:bg-slate-50 hover:text-foreground sm:block"
+        title="Configura tu código para tomar y entregar tareas"
+      >
+        🔑 Mi código
+      </button>
       <Link
         href="/auditoria"
         className="hidden rounded-lg px-3 py-1.5 text-sm font-medium text-muted transition-colors hover:bg-slate-50 hover:text-foreground sm:block"

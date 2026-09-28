@@ -417,6 +417,20 @@ export async function reabrirTarea(id: string, motivo?: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
+// ---------- Código personal del usuario (validación de iniciativa) ----------
+export async function setMiCodigo(codigo: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.rpc("set_mi_codigo", { p_codigo: codigo });
+  if (error) throw new Error(error.message);
+}
+
+export async function miCodigoEstado(): Promise<boolean> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("mi_codigo_estado");
+  if (error) return false;
+  return Boolean(data);
+}
+
 export async function marcarNotificacionesLeidas(ids?: string[]): Promise<void> {
   const supabase = createClient();
   await supabase.rpc("notificaciones_marcar_leidas", {

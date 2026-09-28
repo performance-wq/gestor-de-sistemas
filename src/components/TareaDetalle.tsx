@@ -39,6 +39,7 @@ import {
   listarEventosTarea,
   revisionTerminar,
   terminarTarea,
+  tomarTarea,
   tiemposPorTarea,
   type RegistroTiempo,
 } from "@/lib/tiempo";
@@ -72,6 +73,8 @@ export function TareaDetalle({
   const [eventos, setEventos] = useState<RegistroTiempo[]>([]);
   const [cronoKey, setCronoKey] = useState(0);
   const [confirmTerminar, setConfirmTerminar] = useState(false);
+  const [confirmTomar, setConfirmTomar] = useState(false);
+  const [codigo, setCodigo] = useState("");
   const [confirmRevision, setConfirmRevision] = useState(false);
   const [motivoRev, setMotivoRev] = useState("");
   const [accionando, setAccionando] = useState(false);
@@ -102,13 +105,31 @@ export function TareaDetalle({
     [eventos, tareaId],
   );
 
-  async function terminar() {
-    if (!tarea) return;
+  async function tomar() {
+    if (!tarea || !codigo.trim()) return;
     setAccionando(true);
     setError(null);
     try {
-      await terminarTarea(tarea.id);
+      await tomarTarea(tarea.id, codigo.trim());
+      setConfirmTomar(false);
+      setCodigo("");
+      await cargar();
+      onChanged?.();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo tomar la tarea.");
+    } finally {
+      setAccionando(false);
+    }
+  }
+
+  async function terminar() {
+    if (!tarea || !codigo.trim()) return;
+    setAccionando(true);
+    setError(null);
+    try {
+      await terminarTarea(tarea.id, codigo.trim());
       setConfirmTerminar(false);
+      setCodigo("");
       await cargar();
       onChanged?.();
     } catch (e) {
@@ -351,8 +372,49 @@ export function TareaDetalle({
             </div>
           )}
 
-          {/* Cronómetro del EJECUTOR + Terminar tarea */}
+          {/* DISPONIBLE: tomar por iniciativa (sin responsable) */}
           {usuario &&
+            !tarea.responsableId &&
+            ["pendiente", "reabierta"].includes(tarea.estado) && (
+              <div className="rounded-xl border border-accent/30 bg-accent/5 p-4">
+                <p className="text-sm font-medium text-foreground">
+                  Tarea disponible
+                </p>
+                <p className="mt-0.5 text-sm text-muted">
+                  Nadie la ha tomado todavía. Si vas a encargarte, tómala por
+                  iniciativa: arranca tu cronómetro y quedas como responsable.
+                </p>
+                <button
+                  onClick={() => {
+                    setCodigo("");
+                    setError(null);
+                    setConfirmTomar(true);
+                  }}
+                  className="mt-3 w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 sm:w-auto"
+                >
+                  🙋 Tomar tarea
+                </button>
+              </div>
+            )}
+
+          {/* TOMADA por otra persona (no responsable, no gestor): solo lectura */}
+          {usuario &&
+            tarea.responsableId &&
+            tarea.responsableId !== usuario.id &&
+            !gestor &&
+            ["en_proceso", "pendiente", "reabierta"].includes(tarea.estado) && (
+              <div className="rounded-lg bg-slate-50 px-3 py-2.5 text-sm text-muted ring-1 ring-inset ring-border">
+                {etiquetaEstado(tarea.estado)} —{" "}
+                <strong className="text-foreground">
+                  {nombrePorId[tarea.responsableId] ?? "—"}
+                </strong>{" "}
+                ya tomó esta tarea.
+              </div>
+            )}
+
+          {/* Cronómetro del EJECUTOR + Terminar tarea (responsable o gestor) */}
+          {usuario &&
+            tarea.responsableId &&
             ["pendiente", "en_proceso", "reabierta"].includes(tarea.estado) &&
             (usuario.id === tarea.responsableId || gestor) && (
               <div className="space-y-2">
@@ -364,10 +426,14 @@ export function TareaDetalle({
                   onCambio={cargar}
                 />
                 <button
-                  onClick={() => setConfirmTerminar(true)}
+                  onClick={() => {
+                    setCodigo("");
+                    setError(null);
+                    setConfirmTerminar(true);
+                  }}
                   className="w-full rounded-lg bg-foreground px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 sm:w-auto"
                 >
-                  ✓ Terminar tarea
+                  ✓ Entregar tarea
                 </button>
               </div>
             )}
@@ -443,10 +509,57 @@ export function TareaDetalle({
             </div>
           )}
 
-          {/* Confirmación: Terminar tarea */}
+          {/* Confirmación: Tomar tarea (código de usuario) */}
+          {confirmTomar && (
+            <div className="rounded-xl border border-accent/40 bg-surface p-4 shadow-sm">
+              <p className="text-sm font-semibold">¿Quieres tomar esta tarea?</p>
+              <ul className="mt-2 space-y-1 text-sm text-muted">
+                <li>• Quedarás como responsable de ejecutarla.</li>
+                <li>• Pasará a En proceso y arrancará tu cronómetro.</li>
+                <li>• Quedará registrada tu iniciativa en el historial.</li>
+              </ul>
+              <label className="mt-3 block text-sm font-medium">
+                Tu código de usuario
+              </label>
+              <input
+                type="password"
+                value={codigo}
+                onChange={(e) => setCodigo(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && codigo.trim() && tomar()}
+                autoComplete="off"
+                placeholder="••••"
+                className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+              />
+              <p className="mt-1 text-xs text-muted">
+                ¿No tienes código? Configúralo en tu menú de usuario (🔑 Mi código).
+              </p>
+              <div className="mt-3 flex justify-end gap-2">
+                <button
+                  onClick={() => {
+                    setConfirmTomar(false);
+                    setCodigo("");
+                  }}
+                  className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted hover:bg-slate-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={tomar}
+                  disabled={accionando || !codigo.trim()}
+                  className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+                >
+                  Confirmar y tomar
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Confirmación: Entregar tarea (código de usuario) */}
           {confirmTerminar && (
             <div className="rounded-xl border border-border bg-surface p-4 shadow-sm">
-              <p className="text-sm font-semibold">¿Quieres finalizar esta tarea?</p>
+              <p className="text-sm font-semibold">
+                ¿Confirmas que deseas entregar esta tarea?
+              </p>
               <ul className="mt-2 space-y-1 text-sm text-muted">
                 <li>• Se detendrá definitivamente tu cronómetro.</li>
                 <li>• Dejará de ser editable para ti.</li>
@@ -455,19 +568,34 @@ export function TareaDetalle({
                   {tarea.requiereValidacion ? "En revisión" : "Cerrada"}.
                 </li>
               </ul>
+              <label className="mt-3 block text-sm font-medium">
+                Tu código de usuario
+              </label>
+              <input
+                type="password"
+                value={codigo}
+                onChange={(e) => setCodigo(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && codigo.trim() && terminar()}
+                autoComplete="off"
+                placeholder="••••"
+                className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+              />
               <div className="mt-3 flex justify-end gap-2">
                 <button
-                  onClick={() => setConfirmTerminar(false)}
+                  onClick={() => {
+                    setConfirmTerminar(false);
+                    setCodigo("");
+                  }}
                   className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted hover:bg-slate-50"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={terminar}
-                  disabled={accionando}
+                  disabled={accionando || !codigo.trim()}
                   className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
                 >
-                  Sí, terminar tarea
+                  Sí, entregar tarea
                 </button>
               </div>
             </div>
@@ -640,6 +768,8 @@ function descripcionHistorial(h: TareaHistorial): string {
       )} → ${etiquetaEstado((h.valorNuevo as TareaEstado) ?? "")}`;
     case "asignada":
       return "actualizó el responsable";
+    case "iniciativa":
+      return "tomó la tarea por iniciativa";
     case "reabierta":
       return "reabrió la tarea";
     case "comentario":
