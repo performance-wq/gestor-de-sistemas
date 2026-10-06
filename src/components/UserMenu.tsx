@@ -42,12 +42,21 @@ export function UserMenu() {
         Actividad
       </Link>
       {usuario.rol === "admin" && (
-        <Link
-          href="/admin"
-          className="rounded-lg px-3 py-1.5 text-sm font-medium text-muted transition-colors hover:bg-slate-50 hover:text-foreground"
-        >
-          Admin
-        </Link>
+        <>
+          <Link
+            href="/archivados"
+            className="hidden rounded-lg px-3 py-1.5 text-sm font-medium text-muted transition-colors hover:bg-slate-50 hover:text-foreground sm:block"
+            title="Proyectos archivados"
+          >
+            🗑 Papelera
+          </Link>
+          <Link
+            href="/admin"
+            className="rounded-lg px-3 py-1.5 text-sm font-medium text-muted transition-colors hover:bg-slate-50 hover:text-foreground"
+          >
+            Admin
+          </Link>
+        </>
       )}
       <div className="hidden text-right sm:block">
         <div className="text-sm font-medium leading-tight">{usuario.nombre}</div>

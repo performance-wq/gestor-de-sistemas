@@ -40,6 +40,15 @@ interface CrearProyectoInput {
   nicho?: string;
 }
 
+export interface ProyectoArchivado {
+  id: string;
+  nombre: string;
+  cliente: string | null;
+  estado: string;
+  archivadoEn: string | null;
+  archivadoPorNombre: string | null;
+}
+
 interface StoreValue {
   proyectos: Proyecto[];
   cargado: boolean;
@@ -52,6 +61,9 @@ interface StoreValue {
     patch: Partial<Omit<Proyecto, "id" | "sistemas" | "creado">>,
   ) => Promise<void>;
   eliminarProyecto: (id: string) => Promise<void>;
+  archivarProyecto: (id: string) => Promise<void>;
+  restaurarProyecto: (id: string) => Promise<void>;
+  listarArchivados: () => Promise<ProyectoArchivado[]>;
   agregarSistema: (pid: string, nombre: string) => Promise<void>;
   renombrarSistema: (pid: string, sid: string, nombre: string) => Promise<void>;
   eliminarSistema: (pid: string, sid: string) => Promise<void>;
@@ -139,6 +151,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const { data, error } = await supabase
       .from("proyectos")
       .select("*, sistemas(*, puntos(*))")
+      .is("archivado_en", null)
       .order("created_at", { ascending: false });
     if (error) {
       console.error("Error cargando proyectos:", error.message);
@@ -267,10 +280,49 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     async (id: string) => {
       setProyectos((prev) => prev.filter((p) => p.id !== id));
       const { error } = await supabase.from("proyectos").delete().eq("id", id);
-      if (error) console.error("Error eliminando proyecto:", error.message);
+      if (error) throw new Error(error.message);
     },
     [supabase],
   );
+
+  // Archivar = borrado suave (recuperable desde la Papelera, solo admin).
+  const archivarProyecto = useCallback(
+    async (id: string) => {
+      const { error } = await supabase.rpc("proyecto_archivar", { p_id: id });
+      if (error) throw new Error(error.message);
+      setProyectos((prev) => prev.filter((p) => p.id !== id));
+    },
+    [supabase],
+  );
+
+  const restaurarProyecto = useCallback(
+    async (id: string) => {
+      const { error } = await supabase.rpc("proyecto_restaurar", { p_id: id });
+      if (error) throw new Error(error.message);
+      await fetchProyectos();
+    },
+    [supabase, fetchProyectos],
+  );
+
+  const listarArchivados = useCallback(async (): Promise<ProyectoArchivado[]> => {
+    const { data, error } = await supabase
+      .from("proyectos")
+      .select("id, nombre, cliente, estado, archivado_en, archivado_por_nombre")
+      .not("archivado_en", "is", null)
+      .order("archivado_en", { ascending: false });
+    if (error) {
+      console.error("Error listando archivados:", error.message);
+      return [];
+    }
+    return (data ?? []).map((r: Row) => ({
+      id: r.id as string,
+      nombre: r.nombre as string,
+      cliente: (r.cliente as string) ?? null,
+      estado: (r.estado as string) ?? "",
+      archivadoEn: (r.archivado_en as string) ?? null,
+      archivadoPorNombre: (r.archivado_por_nombre as string) ?? null,
+    }));
+  }, [supabase]);
 
   const agregarSistema = useCallback(
     async (pid: string, nombre: string) => {
@@ -471,6 +523,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       crearProyecto,
       actualizarProyecto,
       eliminarProyecto,
+      archivarProyecto,
+      restaurarProyecto,
+      listarArchivados,
       agregarSistema,
       renombrarSistema,
       eliminarSistema,
@@ -488,6 +543,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       crearProyecto,
       actualizarProyecto,
       eliminarProyecto,
+      archivarProyecto,
+      restaurarProyecto,
+      listarArchivados,
       agregarSistema,
       renombrarSistema,
       eliminarSistema,

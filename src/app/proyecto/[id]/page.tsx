@@ -40,14 +40,18 @@ export default function ProyectoView() {
     usuario,
     getProyecto,
     actualizarProyecto,
-    eliminarProyecto,
+    archivarProyecto,
     agregarSistema,
   } = useStore();
   const [nuevoSistema, setNuevoSistema] = useState("");
   const [fase, setFase] = useState<Fase>("implementacion");
   const [miembros, setMiembros] = useState<Miembro[]>([]);
   const [editando, setEditando] = useState(false);
+  const [archivando, setArchivando] = useState(false);
+  const [confirmArch, setConfirmArch] = useState("");
+  const [errorArch, setErrorArch] = useState<string | null>(null);
   const gestor = esGestor(usuario?.rol);
+  const esAdmin = usuario?.rol === "admin";
 
   useEffect(() => {
     listarMiembros().then(setMiembros);
@@ -107,21 +111,18 @@ export default function ProyectoView() {
               >
                 ✏️ Editar proyecto
               </button>
-              <button
-                onClick={() => {
-                  if (
-                    confirm(
-                      `¿Eliminar el proyecto "${proyecto.nombre}"? Esta acción no se puede deshacer.`,
-                    )
-                  ) {
-                    eliminarProyecto(proyecto.id);
-                    router.push("/dashboard");
-                  }
-                }}
-                className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
-              >
-                🗑 Eliminar proyecto
-              </button>
+              {esAdmin && (
+                <button
+                  onClick={() => {
+                    setConfirmArch("");
+                    setErrorArch(null);
+                    setArchivando(true);
+                  }}
+                  className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
+                >
+                  🗑 Archivar proyecto
+                </button>
+              )}
             </div>
           )}
 
@@ -130,6 +131,72 @@ export default function ProyectoView() {
               proyecto={proyecto}
               onClose={() => setEditando(false)}
             />
+          )}
+
+          {archivando && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+              onClick={() => setArchivando(false)}
+            >
+              <div
+                className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <h2 className="text-lg font-semibold text-red-700">
+                  Archivar proyecto
+                </h2>
+                <p className="mt-1.5 text-sm text-muted">
+                  El proyecto{" "}
+                  <span className="font-medium text-foreground">
+                    “{proyecto.nombre}”
+                  </span>{" "}
+                  se moverá a la Papelera. No se elimina: podrás recuperarlo tú
+                  (administrador) desde <span className="font-medium">🗑 Papelera</span>.
+                </p>
+                <label className="mt-4 block text-sm font-medium">
+                  Para confirmar, escribe{" "}
+                  <span className="font-bold">ARCHIVAR</span>
+                </label>
+                <input
+                  autoFocus
+                  value={confirmArch}
+                  onChange={(e) => setConfirmArch(e.target.value)}
+                  placeholder="ARCHIVAR"
+                  autoComplete="off"
+                  className="mt-1.5 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+                />
+                {errorArch && (
+                  <p className="mt-2 text-sm text-red-600">{errorArch}</p>
+                )}
+                <div className="mt-4 flex justify-end gap-2">
+                  <button
+                    onClick={() => setArchivando(false)}
+                    className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted hover:bg-slate-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    disabled={confirmArch.trim().toUpperCase() !== "ARCHIVAR"}
+                    onClick={async () => {
+                      setErrorArch(null);
+                      try {
+                        await archivarProyecto(proyecto.id);
+                        router.push("/dashboard");
+                      } catch (e) {
+                        setErrorArch(
+                          e instanceof Error
+                            ? e.message
+                            : "No se pudo archivar.",
+                        );
+                      }
+                    }}
+                    className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Archivar
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
         </div>
 
