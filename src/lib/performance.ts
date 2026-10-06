@@ -411,3 +411,165 @@ export function soportePorCliente(
     })
     .sort((a, b) => b.horasMs - a.horasMs || b.tickets - a.tickets);
 }
+
+// ---------- Resultados por día ----------
+// Qué pasó un día concreto: horas reales de cronómetro recortadas al día,
+// por colaborador y por tarea, más las tareas cerradas ese día. Sirve para
+// el control operativo diario (¿quién trabajó, cuánto y en qué?).
+
+export interface FilaDiaColaborador {
+  id: string;
+  nombre: string;
+  ms: number;
+  nTareas: number;
+  nSesiones: number;
+  cerradas: number;
+}
+export interface FilaDiaTarea {
+  id: string;
+  titulo: string;
+  proyecto: string;
+  ms: number;
+  usuarios: string[];
+}
+export interface ResumenDia {
+  totalMs: number;
+  cerradas: number;
+  colaboradores: FilaDiaColaborador[];
+  tareas: FilaDiaTarea[];
+}
+
+// Límites [00:00, 24:00) del día local a partir de "YYYY-MM-DD".
+function limitesDia(diaISO: string): [number, number] {
+  const [y, m, d] = diaISO.split("-").map(Number);
+  const desde = new Date(y, (m ?? 1) - 1, d ?? 1).getTime();
+  return [desde, desde + DIA];
+}
+
+export function resumenPorDia(
+  eventos: RegistroTiempo[],
+  tareas: Tarea[],
+  miembros: Miembro[],
+  diaISO: string,
+  proyectoNombre: Record<string, string>,
+): ResumenDia {
+  const [desde, hasta] = limitesDia(diaISO);
+  const ahora = Date.now();
+  const nombrePorId = new Map(miembros.map((m) => [m.id, m.nombre]));
+  const tareaPorId = new Map(tareas.map((t) => [t.id, t]));
+
+  const grupos = new Map<string, RegistroTiempo[]>();
+  for (const e of eventos) {
+    if (!e.userId) continue;
+    const k = `${e.userId}::${e.taskId}`;
+    (grupos.get(k) ?? grupos.set(k, []).get(k)!).push(e);
+  }
+
+  const porUser = new Map<string, { ms: number; tareas: Set<string>; ses: number }>();
+  const porTarea = new Map<string, { ms: number; users: Set<string> }>();
+  let totalMs = 0;
+  for (const [k, evs] of grupos) {
+    const [userId, taskId] = k.split("::");
+    let msU = 0;
+    let ses = 0;
+    for (const iv of intervalosDe(evs.sort((a, b) => a.t - b.t))) {
+      const end = iv.end ?? ahora;
+      const sol = Math.max(0, Math.min(end, hasta) - Math.max(iv.start, desde));
+      if (sol > 0) {
+        msU += sol;
+        ses += 1;
+      }
+    }
+    if (msU > 0) {
+      totalMs += msU;
+      const u = porUser.get(userId) ?? { ms: 0, tareas: new Set(), ses: 0 };
+      u.ms += msU;
+      u.tareas.add(taskId);
+      u.ses += ses;
+      porUser.set(userId, u);
+      const tt = porTarea.get(taskId) ?? { ms: 0, users: new Set() };
+      tt.ms += msU;
+      tt.users.add(userId);
+      porTarea.set(taskId, tt);
+    }
+  }
+
+  // Tareas cerradas ese día (por su cerradaAt), atribuidas al responsable.
+  const cerradasUser = new Map<string, number>();
+  let cerradasTot = 0;
+  for (const t of tareas) {
+    const c = ms(t.cerradaAt);
+    if (c !== null && c >= desde && c < hasta && t.estado === "cerrada") {
+      cerradasTot += 1;
+      if (t.responsableId)
+        cerradasUser.set(t.responsableId, (cerradasUser.get(t.responsableId) ?? 0) + 1);
+    }
+  }
+
+  const colaboradores: FilaDiaColaborador[] = [...porUser.entries()]
+    .map(([id, v]) => ({
+      id,
+      nombre: nombrePorId.get(id) ?? "—",
+      ms: v.ms,
+      nTareas: v.tareas.size,
+      nSesiones: v.ses,
+      cerradas: cerradasUser.get(id) ?? 0,
+    }))
+    .sort((a, b) => b.ms - a.ms);
+
+  const tareasOut: FilaDiaTarea[] = [...porTarea.entries()]
+    .map(([id, v]) => {
+      const t = tareaPorId.get(id);
+      return {
+        id,
+        titulo: t?.titulo ?? "—",
+        proyecto: t ? proyectoNombre[t.proyectoId] ?? "—" : "—",
+        ms: v.ms,
+        usuarios: [...v.users].map((u) => nombrePorId.get(u) ?? "—"),
+      };
+    })
+    .sort((a, b) => b.ms - a.ms);
+
+  return { totalMs, cerradas: cerradasTot, colaboradores, tareas: tareasOut };
+}
+
+// Serie de los últimos N días: total de horas reales por día (para tendencia).
+export function serieDiaria(
+  eventos: RegistroTiempo[],
+  nDias = 14,
+): { dia: string; label: string; ms: number }[] {
+  const ahora = Date.now();
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+
+  const grupos = new Map<string, RegistroTiempo[]>();
+  for (const e of eventos) {
+    if (!e.userId) continue;
+    const k = `${e.userId}::${e.taskId}`;
+    (grupos.get(k) ?? grupos.set(k, []).get(k)!).push(e);
+  }
+  const ivTodos = [...grupos.values()].map((evs) =>
+    intervalosDe(evs.sort((a, b) => a.t - b.t)),
+  );
+
+  const out: { dia: string; label: string; ms: number }[] = [];
+  for (let i = nDias - 1; i >= 0; i--) {
+    const d = new Date(hoy);
+    d.setDate(d.getDate() - i);
+    const desde = d.getTime();
+    const hasta = desde + DIA;
+    let total = 0;
+    for (const ivs of ivTodos)
+      for (const iv of ivs) {
+        const end = iv.end ?? ahora;
+        total += Math.max(0, Math.min(end, hasta) - Math.max(iv.start, desde));
+      }
+    const dia = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    out.push({
+      dia,
+      label: d.toLocaleDateString("es-ES", { weekday: "short", day: "2-digit" }),
+      ms: total,
+    });
+  }
+  return out;
+}

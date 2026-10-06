@@ -13,6 +13,8 @@ import {
 import {
   calcularPerformance,
   formatHM,
+  resumenPorDia,
+  serieDiaria,
   soportePorCliente,
   type PeriodoSoporte,
 } from "@/lib/performance";
@@ -82,6 +84,18 @@ export default function Performance() {
     [tareas, miembros, eventos, proyectoNombre, sistemaNombre],
   );
 
+  // Resultados por día.
+  const [dia, setDia] = useState<string>(() => {
+    const n = new Date();
+    return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+  });
+  const resDia = useMemo(
+    () => resumenPorDia(eventos, tareas, miembros, dia, proyectoNombre),
+    [eventos, tareas, miembros, dia, proyectoNombre],
+  );
+  const serie = useMemo(() => serieDiaria(eventos, 14), [eventos]);
+  const maxSerie = Math.max(1, ...serie.map((s) => s.ms));
+
   if (cargado && !permitido)
     return (
       <div className="py-20 text-center text-sm text-muted">
@@ -126,6 +140,112 @@ export default function Performance() {
               valor={String(data.vencidas)}
               tono={data.vencidas ? "text-red-600" : "text-foreground"}
             />
+          </div>
+
+          {/* ---------- Resultados por día ---------- */}
+          <div className="mt-6 rounded-xl border border-border bg-surface p-5 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold">Resultados por día</h2>
+                <p className="text-[11px] text-muted">
+                  Horas reales de cronómetro de ese día: quién trabajó, cuánto y
+                  en qué.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={dia}
+                  onChange={(e) => setDia(e.target.value)}
+                  className="rounded-lg border border-border bg-surface px-2.5 py-1.5 text-sm outline-none focus:border-accent"
+                />
+                <span className="rounded-lg bg-accent/10 px-2.5 py-1.5 text-sm font-semibold text-accent">
+                  {formatHM(resDia.totalMs)}
+                </span>
+              </div>
+            </div>
+
+            {/* Tendencia 14 días (clic para ver el día) */}
+            <div className="mt-4 flex items-end gap-1.5">
+              {serie.map((s) => {
+                const activo = s.dia === dia;
+                const h = Math.round((s.ms / maxSerie) * 56);
+                return (
+                  <button
+                    key={s.dia}
+                    onClick={() => setDia(s.dia)}
+                    title={`${s.label}: ${formatHM(s.ms)}`}
+                    className="group flex flex-1 flex-col items-center gap-1"
+                  >
+                    <div className="flex h-14 w-full items-end justify-center">
+                      <div
+                        className={`w-full max-w-[22px] rounded-t transition-colors ${
+                          activo
+                            ? "bg-accent"
+                            : "bg-slate-200 group-hover:bg-slate-300"
+                        }`}
+                        style={{ height: `${Math.max(2, h)}px` }}
+                      />
+                    </div>
+                    <span
+                      className={`text-[10px] ${activo ? "font-semibold text-accent" : "text-muted"}`}
+                    >
+                      {s.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="mt-5 grid gap-5 lg:grid-cols-2">
+              <div>
+                <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">
+                  Por colaborador
+                </h3>
+                {resDia.colaboradores.length === 0 ? (
+                  <p className="py-6 text-center text-sm text-muted">
+                    Nadie registró tiempo ese día.
+                  </p>
+                ) : (
+                  <Tabla
+                    cols={["Colaborador", "Horas", "Tareas", "Sesiones", "Cerradas"]}
+                    filas={resDia.colaboradores.map((c) => [
+                      c.nombre,
+                      formatHM(c.ms),
+                      String(c.nTareas),
+                      String(c.nSesiones),
+                      String(c.cerradas),
+                    ])}
+                  />
+                )}
+              </div>
+              <div>
+                <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">
+                  Tareas trabajadas ese día
+                </h3>
+                {resDia.tareas.length === 0 ? (
+                  <p className="py-6 text-center text-sm text-muted">
+                    Sin tareas trabajadas.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {resDia.tareas.map((t) => (
+                      <div key={t.id} className="text-sm">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <span className="truncate font-medium">{t.titulo}</span>
+                          <span className="shrink-0 text-xs font-semibold text-foreground">
+                            {formatHM(t.ms)}
+                          </span>
+                        </div>
+                        <div className="truncate text-xs text-muted">
+                          {t.proyecto} · {t.usuarios.join(", ")}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
           {data.alertas.length > 0 && (
