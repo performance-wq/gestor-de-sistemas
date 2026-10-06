@@ -10,7 +10,12 @@ import {
   type Miembro,
   type Tarea,
 } from "@/lib/tasks";
-import { calcularPerformance, formatHM } from "@/lib/performance";
+import {
+  calcularPerformance,
+  formatHM,
+  soportePorCliente,
+  type PeriodoSoporte,
+} from "@/lib/performance";
 import { listarEventosTiempo, type RegistroTiempo } from "@/lib/tiempo";
 
 // Dashboard de Performance Gerencial. Mide el TIEMPO REAL de trabajo
@@ -50,6 +55,26 @@ export default function Performance() {
     for (const p of proyectos) for (const s of p.sistemas) m[s.id] = s.nombre;
     return m;
   }, [proyectos]);
+
+  const [periodo, setPeriodo] = useState<PeriodoSoporte>("mes");
+  // Costo por hora del equipo: preferencia local del gestor (solo para estimar).
+  const [costoHora, setCostoHora] = useState<string>(() => {
+    try {
+      return localStorage.getItem("perf_costo_hora") ?? "";
+    } catch {
+      return "";
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem("perf_costo_hora", costoHora);
+    } catch {}
+  }, [costoHora]);
+
+  const clientes = useMemo(
+    () => soportePorCliente(tareas, eventos, periodo, proyectoNombre, sistemaNombre),
+    [tareas, eventos, periodo, proyectoNombre, sistemaNombre],
+  );
 
   const data = useMemo(
     () =>
@@ -238,12 +263,148 @@ export default function Performance() {
             </Panel>
           </div>
 
+          {/* Soporte por cliente */}
+          <SoportePorCliente
+            filas={clientes}
+            periodo={periodo}
+            setPeriodo={setPeriodo}
+            costoHora={costoHora}
+            setCostoHora={setCostoHora}
+          />
+
           <p className="mt-6 text-xs text-muted">
             Todos los tiempos provienen del cronómetro por tarea (ejecución +
             corrección para el ejecutor, revisión para el supervisor). No se usa
             el tiempo entre creación y cierre.
           </p>
         </>
+      )}
+    </div>
+  );
+}
+
+const PERIODOS: { valor: PeriodoSoporte; label: string }[] = [
+  { valor: "mes", label: "Este mes" },
+  { valor: "mes_anterior", label: "Mes anterior" },
+  { valor: "todo", label: "Todo" },
+];
+
+function SoportePorCliente({
+  filas,
+  periodo,
+  setPeriodo,
+  costoHora,
+  setCostoHora,
+}: {
+  filas: ReturnType<typeof soportePorCliente>;
+  periodo: PeriodoSoporte;
+  setPeriodo: (p: PeriodoSoporte) => void;
+  costoHora: string;
+  setCostoHora: (v: string) => void;
+}) {
+  const tarifa = Number(costoHora.replace(",", "."));
+  const conCosto = tarifa > 0;
+  const totTickets = filas.reduce((a, f) => a + f.tickets, 0);
+  const totMs = filas.reduce((a, f) => a + f.horasMs, 0);
+  const sinSistema = filas.reduce((a, f) => a + f.sinSistema, 0);
+  const costo = (msVal: number) =>
+    `$${Math.round((msVal / 3_600_000) * tarifa).toLocaleString("es")}`;
+
+  return (
+    <div className="mt-6 rounded-xl border border-border bg-surface p-5 shadow-sm">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold">Soporte por cliente</h2>
+          <p className="text-[11px] text-muted">
+            Tickets posventa (todo menos implementación) y horas reales de
+            cronómetro. Los de arriba son los que más te cuestan.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex rounded-lg border border-border p-0.5 text-xs">
+            {PERIODOS.map((p) => (
+              <button
+                key={p.valor}
+                onClick={() => setPeriodo(p.valor)}
+                className={`rounded-md px-2.5 py-1 font-medium ${
+                  periodo === p.valor
+                    ? "bg-accent text-white"
+                    : "text-muted hover:text-foreground"
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <label className="flex items-center gap-1.5 text-xs text-muted">
+            Costo/hora $
+            <input
+              value={costoHora}
+              onChange={(e) => setCostoHora(e.target.value)}
+              inputMode="decimal"
+              placeholder="0"
+              className="w-16 rounded-md border border-border bg-surface px-2 py-1 text-right text-xs text-foreground outline-none focus:border-accent"
+            />
+          </label>
+        </div>
+      </div>
+
+      {filas.length === 0 ? (
+        <p className="py-6 text-center text-sm text-muted">
+          Sin tickets de soporte en este periodo.
+        </p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-xs text-muted">
+                <th className="py-1.5 text-left font-medium">Cliente</th>
+                <th className="py-1.5 text-right font-medium">Tickets</th>
+                <th className="py-1.5 text-right font-medium">Ajustes/incid.</th>
+                <th className="py-1.5 text-right font-medium">Horas</th>
+                {conCosto && <th className="py-1.5 text-right font-medium">Costo</th>}
+                <th className="py-1.5 pl-4 text-left font-medium">Sistema con más tickets</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filas.map((f) => (
+                <tr key={f.proyectoId} className="border-t border-border">
+                  <td className="max-w-[14rem] truncate py-2">{f.cliente}</td>
+                  <td className="py-2 text-right tabular-nums">{f.tickets}</td>
+                  <td className="py-2 text-right tabular-nums">{f.retrabajo}</td>
+                  <td className="py-2 text-right font-semibold tabular-nums">
+                    {formatHM(f.horasMs)}
+                  </td>
+                  {conCosto && (
+                    <td className="py-2 text-right tabular-nums">{costo(f.horasMs)}</td>
+                  )}
+                  <td className="max-w-[12rem] truncate py-2 pl-4 text-muted">
+                    {f.sistemaTop ?? "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-border text-xs font-semibold">
+                <td className="py-2">Total</td>
+                <td className="py-2 text-right tabular-nums">{totTickets}</td>
+                <td className="py-2 text-right tabular-nums">
+                  {filas.reduce((a, f) => a + f.retrabajo, 0)}
+                </td>
+                <td className="py-2 text-right tabular-nums">{formatHM(totMs)}</td>
+                {conCosto && <td className="py-2 text-right tabular-nums">{costo(totMs)}</td>}
+                <td />
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+
+      {sinSistema > 0 && (
+        <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-inset ring-amber-200">
+          {sinSistema} ticket(s) sin sistema en este periodo: edítalos y
+          asígnales sistema para saber qué parte de la plantilla falla.
+        </p>
       )}
     </div>
   );

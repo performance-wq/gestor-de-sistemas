@@ -15,6 +15,7 @@ import { OnboardingPanel } from "@/components/OnboardingPanel";
 import { ChecklistGestion } from "@/components/ChecklistGestion";
 import { SeguimientoProyecto } from "@/components/SeguimientoProyecto";
 import { HistorialProyecto } from "@/components/HistorialProyecto";
+import { EditarProyectoModal } from "@/components/EditarProyectoModal";
 
 type Fase =
   | "onboarding"
@@ -45,6 +46,7 @@ export default function ProyectoView() {
   const [nuevoSistema, setNuevoSistema] = useState("");
   const [fase, setFase] = useState<Fase>("implementacion");
   const [miembros, setMiembros] = useState<Miembro[]>([]);
+  const [editando, setEditando] = useState(false);
   const gestor = esGestor(usuario?.rol);
 
   useEffect(() => {
@@ -98,7 +100,13 @@ export default function ProyectoView() {
             <p className="mt-0.5 text-sm text-muted">{proyecto.nicho}</p>
           )}
           {gestor && (
-            <div className="mt-3">
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                onClick={() => setEditando(true)}
+                className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-slate-50"
+              >
+                ✏️ Editar proyecto
+              </button>
               <button
                 onClick={() => {
                   if (
@@ -112,9 +120,16 @@ export default function ProyectoView() {
                 }}
                 className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
               >
-                Eliminar proyecto
+                🗑 Eliminar proyecto
               </button>
             </div>
+          )}
+
+          {editando && (
+            <EditarProyectoModal
+              proyecto={proyecto}
+              onClose={() => setEditando(false)}
+            />
           )}
         </div>
 

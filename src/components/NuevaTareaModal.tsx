@@ -81,6 +81,12 @@ export function NuevaTareaModal({
       setError("El título es obligatorio.");
       return;
     }
+    // El sistema es obligatorio (si el proyecto tiene): sin él no se puede
+    // medir qué cliente/sistema consume soporte.
+    if (sistemas.length > 0 && !sistemaId) {
+      setError("Selecciona el sistema al que pertenece la tarea.");
+      return;
+    }
     setGuardando(true);
     try {
       const id = await crearTarea({
@@ -196,6 +202,25 @@ export function NuevaTareaModal({
           />
         </div>
 
+        {/* Sistema (obligatorio si el proyecto tiene sistemas) */}
+        {sistemas.length > 0 && (
+          <div>
+            <label className="mb-1 block text-sm font-medium">Sistema *</label>
+            <select
+              value={sistemaId}
+              onChange={(e) => setSistemaId(e.target.value)}
+              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
+            >
+              <option value="">Selecciona el sistema…</option>
+              {sistemas.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {/* Tipo + Prioridad */}
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -268,27 +293,10 @@ export function NuevaTareaModal({
             onClick={() => setMostrarOpcionales(true)}
             className="text-sm font-medium text-accent hover:underline"
           >
-            + Sistema y descripción (opcional)
+            + Descripción y evidencia (opcional)
           </button>
         ) : (
           <div className="space-y-4 rounded-lg border border-dashed border-border p-3">
-            {sistemas.length > 0 && (
-              <div>
-                <label className="mb-1 block text-sm font-medium">Sistema</label>
-                <select
-                  value={sistemaId}
-                  onChange={(e) => setSistemaId(e.target.value)}
-                  className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-accent"
-                >
-                  <option value="">Sin sistema</option>
-                  {sistemas.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.nombre}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
             <div>
               <label className="mb-1 block text-sm font-medium">Descripción</label>
               <textarea

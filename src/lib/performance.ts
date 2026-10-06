@@ -10,6 +10,7 @@ import { ESTADOS_ABIERTOS } from "./tasks";
 import {
   calcularHorasHombre,
   formatHM,
+  intervalosDe,
   tiemposPorTarea,
   type RegistroTiempo,
   type TiemposTarea,
@@ -303,4 +304,110 @@ export function calcularPerformance(
     vencidas,
     alertas,
   };
+}
+
+// ---------- Soporte por cliente (rentabilidad) ----------
+// Cuánto soporte consume cada cliente en un periodo: tickets (toda tarea que
+// no es implementación ni observación interna), retrabajo (ajustes +
+// incidencias) y horas reales de cronómetro de esas tareas. Sirve para
+// detectar clientes que cuestan más de lo que pagan.
+
+export type PeriodoSoporte = "mes" | "mes_anterior" | "todo";
+
+export interface FilaCliente {
+  proyectoId: string;
+  cliente: string;
+  tickets: number;
+  retrabajo: number;
+  horasMs: number;
+  sistemaTop: string | null; // sistema con más tickets
+  sinSistema: number; // tickets sin sistema (no clasificables)
+}
+
+const TIPOS_NO_SOPORTE = new Set(["implementacion", "observacion"]);
+
+export function rangoPeriodo(p: PeriodoSoporte): { desde: number; hasta: number } {
+  const n = new Date();
+  if (p === "mes")
+    return { desde: new Date(n.getFullYear(), n.getMonth(), 1).getTime(), hasta: Infinity };
+  if (p === "mes_anterior")
+    return {
+      desde: new Date(n.getFullYear(), n.getMonth() - 1, 1).getTime(),
+      hasta: new Date(n.getFullYear(), n.getMonth(), 1).getTime(),
+    };
+  return { desde: 0, hasta: Infinity };
+}
+
+export function soportePorCliente(
+  tareas: Tarea[],
+  eventos: RegistroTiempo[],
+  periodo: PeriodoSoporte,
+  proyectoNombre: Record<string, string>,
+  sistemaNombre: Record<string, string>,
+): FilaCliente[] {
+  const { desde, hasta } = rangoPeriodo(periodo);
+  const enPeriodo = (t: number) => t >= desde && t < hasta;
+  const soporte = new Map(
+    tareas.filter((t) => !TIPOS_NO_SOPORTE.has(t.tipo)).map((t) => [t.id, t]),
+  );
+
+  // Horas reales por tarea dentro del periodo (intervalo cuenta por su inicio).
+  const horasTarea = new Map<string, number>();
+  {
+    const grupos = new Map<string, RegistroTiempo[]>();
+    for (const e of eventos) {
+      if (!e.userId || !soporte.has(e.taskId)) continue;
+      const k = `${e.taskId}::${e.userId}`;
+      (grupos.get(k) ?? grupos.set(k, []).get(k)!).push(e);
+    }
+    const ahora = Date.now();
+    for (const [k, evs] of grupos) {
+      const taskId = k.split("::")[0];
+      for (const iv of intervalosDe(evs.sort((a, b) => a.t - b.t))) {
+        if (!enPeriodo(iv.start)) continue;
+        horasTarea.set(taskId, (horasTarea.get(taskId) ?? 0) + (iv.end ?? ahora) - iv.start);
+      }
+    }
+  }
+
+  const filas = new Map<string, FilaCliente & { porSistema: Map<string, number> }>();
+  const fila = (pid: string) => {
+    let f = filas.get(pid);
+    if (!f) {
+      f = {
+        proyectoId: pid,
+        cliente: proyectoNombre[pid] ?? "—",
+        tickets: 0,
+        retrabajo: 0,
+        horasMs: 0,
+        sistemaTop: null,
+        sinSistema: 0,
+        porSistema: new Map(),
+      };
+      filas.set(pid, f);
+    }
+    return f;
+  };
+
+  for (const t of soporte.values()) {
+    const creada = ms(t.createdAt) ?? 0;
+    const horas = horasTarea.get(t.id) ?? 0;
+    if (!enPeriodo(creada) && horas === 0) continue;
+    const f = fila(t.proyectoId);
+    f.horasMs += horas;
+    if (!enPeriodo(creada)) continue;
+    f.tickets += 1;
+    if (t.tipo === "ajuste" || t.tipo === "incidencia") f.retrabajo += 1;
+    if (t.sistemaId) {
+      const nom = sistemaNombre[t.sistemaId] ?? "—";
+      f.porSistema.set(nom, (f.porSistema.get(nom) ?? 0) + 1);
+    } else f.sinSistema += 1;
+  }
+
+  return [...filas.values()]
+    .map(({ porSistema, ...f }) => {
+      const top = [...porSistema.entries()].sort((a, b) => b[1] - a[1])[0];
+      return { ...f, sistemaTop: top ? top[0] : null };
+    })
+    .sort((a, b) => b.horasMs - a.horasMs || b.tickets - a.tickets);
 }
