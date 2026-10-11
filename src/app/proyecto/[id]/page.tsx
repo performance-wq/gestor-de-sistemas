@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useStore } from "@/lib/store";
-import { esGestor, listarMiembros, type Miembro } from "@/lib/tasks";
+import { esGestor, listarMiembros, type Miembro } from "@/lib/equipo";
 import { proyectoStats, sistemaStats } from "@/lib/progress";
 import { ESTADOS, estadoStyles, formatFecha } from "@/lib/ui";
 import type { Estado } from "@/lib/types";
@@ -13,23 +13,14 @@ import { Breadcrumb } from "@/components/Breadcrumb";
 import { DatosControl } from "@/components/DatosControl";
 import { OnboardingPanel } from "@/components/OnboardingPanel";
 import { ChecklistGestion } from "@/components/ChecklistGestion";
-import { SeguimientoProyecto } from "@/components/SeguimientoProyecto";
-import { HistorialProyecto } from "@/components/HistorialProyecto";
 import { EditarProyectoModal } from "@/components/EditarProyectoModal";
 
-type Fase =
-  | "onboarding"
-  | "implementacion"
-  | "seguimiento"
-  | "resultados"
-  | "historial";
+type Fase = "onboarding" | "implementacion" | "resultados";
 
 const FASES: { id: Fase; n: number; label: string; hint: string }[] = [
   { id: "onboarding", n: 1, label: "Onboarding", hint: "Información del cliente" },
   { id: "implementacion", n: 2, label: "Implementación", hint: "Sistemas" },
-  { id: "seguimiento", n: 3, label: "Seguimiento", hint: "Tareas" },
-  { id: "resultados", n: 4, label: "Resultados", hint: "Performance" },
-  { id: "historial", n: 5, label: "Historial", hint: "Actividad" },
+  { id: "resultados", n: 3, label: "Resultados", hint: "Performance" },
 ];
 
 export default function ProyectoView() {
@@ -390,10 +381,6 @@ export default function ProyectoView() {
           </div>
         )}
 
-        {fase === "seguimiento" && (
-          <SeguimientoProyecto proyectoId={proyecto.id} />
-        )}
-
         {fase === "resultados" && (
           <div>
             <h2 className="text-lg font-semibold">Resultados</h2>
@@ -404,10 +391,6 @@ export default function ProyectoView() {
               <DatosControl proyecto={proyecto} />
             </div>
           </div>
-        )}
-
-        {fase === "historial" && (
-          <HistorialProyecto proyectoId={proyecto.id} />
         )}
       </div>
     </div>

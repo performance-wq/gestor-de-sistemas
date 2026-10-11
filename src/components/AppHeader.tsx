@@ -2,23 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useStore } from "@/lib/store";
-import { esGestor } from "@/lib/tasks";
 import { UserMenu } from "./UserMenu";
-import { NotificacionesMenu } from "./NotificacionesMenu";
 
 const NAV = [
-  { href: "/tablero", label: "Tablero", match: ["/tablero"], soloGestor: true },
-  { href: "/performance", label: "Performance", match: ["/performance"], soloGestor: true },
-  { href: "/dashboard", label: "Proyectos", match: ["/dashboard", "/proyecto"], soloGestor: false },
-  { href: "/tareas", label: "Gestión de tareas", match: ["/tareas"], soloGestor: false },
+  { href: "/dashboard", label: "Proyectos", match: ["/dashboard", "/proyecto"] },
 ];
 
 export function AppHeader() {
   const pathname = usePathname() ?? "";
-  const { usuario } = useStore();
-  const gestor = esGestor(usuario?.rol);
-  const items = NAV.filter((i) => !i.soloGestor || gestor);
   return (
     <header className="sticky top-0 z-20 border-b border-border bg-surface/80 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
@@ -32,7 +23,7 @@ export function AppHeader() {
             </span>
           </Link>
           <nav className="flex items-center gap-1">
-            {items.map((item) => {
+            {NAV.map((item) => {
               const activo = item.match.some((m) => pathname.startsWith(m));
               return (
                 <Link
@@ -51,7 +42,6 @@ export function AppHeader() {
           </nav>
         </div>
         <div className="flex items-center gap-1">
-          <NotificacionesMenu />
           <UserMenu />
         </div>
       </div>

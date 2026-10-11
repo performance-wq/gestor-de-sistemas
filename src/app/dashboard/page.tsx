@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useStore } from "@/lib/store";
-import { esGestor } from "@/lib/tasks";
+import { esGestor } from "@/lib/equipo";
 import { proyectoStats } from "@/lib/progress";
 import { ESTADOS, NICHOS, estadoStyles, formatFecha } from "@/lib/ui";
 import { listarNichos } from "@/lib/nichos";
