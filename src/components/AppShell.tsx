@@ -10,8 +10,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   // Onboarding (V1 y V2): identidad visual LexBrain (dorado sobre blanco),
   // acotada a esta ruta mediante la clase de tema.
-  if (pathname?.startsWith("/onboarding"))
+  if (pathname?.startsWith("/onboarding") || pathname?.startsWith("/contexto/"))
     return <div className="onb-lexbrain">{children}</div>;
+
+  // Documento imprimible (PDF) del Contexto IA: sin cabecera.
+  if (pathname?.startsWith("/imprimir-contexto")) return <>{children}</>;
 
   if (pathname?.startsWith("/progreso")) return <>{children}</>;
 

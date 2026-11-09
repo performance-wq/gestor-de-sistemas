@@ -10,17 +10,17 @@ import { ESTADOS, estadoStyles, formatFecha } from "@/lib/ui";
 import type { Estado } from "@/lib/types";
 import { ProgressBar } from "@/components/ProgressBar";
 import { Breadcrumb } from "@/components/Breadcrumb";
-import { DatosControl } from "@/components/DatosControl";
+import { ContextoIA } from "@/components/ContextoIA";
 import { OnboardingPanel } from "@/components/OnboardingPanel";
 import { ChecklistGestion } from "@/components/ChecklistGestion";
 import { EditarProyectoModal } from "@/components/EditarProyectoModal";
 
-type Fase = "onboarding" | "implementacion" | "resultados";
+type Fase = "onboarding" | "implementacion" | "contexto";
 
 const FASES: { id: Fase; n: number; label: string; hint: string }[] = [
   { id: "onboarding", n: 1, label: "Onboarding", hint: "Información del cliente" },
   { id: "implementacion", n: 2, label: "Implementación", hint: "Sistemas" },
-  { id: "resultados", n: 3, label: "Resultados", hint: "Performance" },
+  { id: "contexto", n: 3, label: "Contexto IA", hint: "Conversaciones por servicio" },
 ];
 
 export default function ProyectoView() {
@@ -381,16 +381,12 @@ export default function ProyectoView() {
           </div>
         )}
 
-        {fase === "resultados" && (
-          <div>
-            <h2 className="text-lg font-semibold">Resultados</h2>
-            <p className="mt-0.5 text-sm text-muted">
-              Medimos el impacto del proyecto tras la implementación.
-            </p>
-            <div className="mt-4">
-              <DatosControl proyecto={proyecto} />
-            </div>
-          </div>
+        {fase === "contexto" && (
+          <ContextoIA
+            proyectoId={proyecto.id}
+            proyectoNombre={proyecto.nombre}
+            puedeGestionar={gestor}
+          />
         )}
       </div>
     </div>

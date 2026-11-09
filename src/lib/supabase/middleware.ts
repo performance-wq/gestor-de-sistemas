@@ -41,6 +41,7 @@ export async function updateSession(request: NextRequest) {
     path.startsWith("/login") ||
     path.startsWith("/auth") ||
     path.startsWith("/onboarding") ||
+    path.startsWith("/contexto/") ||
     path.startsWith("/progreso");
 
   if (!user && !esPublica) {
