@@ -7,6 +7,8 @@ import { CampoOnboarding } from "@/components/CampoOnboarding";
 import {
   preguntasPlanasDe,
   validar,
+  VERSION_CLIENTE,
+  VERSION_MENTOR,
   type Respuesta,
   type Respuestas,
 } from "@/lib/onboarding-schema";
@@ -198,24 +200,54 @@ export default function OnboardingPage() {
             </span>
           </div>
 
-          <h1 className="mt-8 text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
-            Bienvenido a LexBrain <span className="inline-block">👋</span>
-          </h1>
+          {version === VERSION_MENTOR ? (
+            <>
+              <h1 className="mt-8 text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
+                Hola, mentor <span className="inline-block">👋</span>
+              </h1>
+              <p className="mt-5 text-lg text-muted">
+                Gracias por acompañar a este empresario.
+              </p>
+              <p className="mt-4 leading-relaxed text-muted">
+                Aquí solo necesitamos el <strong>Prompt Maestro</strong> del
+                negocio: la información con la que la inteligencia artificial
+                va a atender a sus prospectos.
+              </p>
+              <p className="mt-3 leading-relaxed text-muted">
+                Con esto podemos empezar a configurar la IA de su proyecto.
+              </p>
+            </>
+          ) : (
+            <>
+              <h1 className="mt-8 text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
+                Bienvenido a LexBrain <span className="inline-block">👋</span>
+              </h1>
 
-          <p className="mt-5 text-lg text-muted">Gracias por confiar en nosotros.</p>
+              <p className="mt-5 text-lg text-muted">Gracias por confiar en nosotros.</p>
 
-          <p className="mt-4 leading-relaxed text-muted">
-            Este formulario nos permitirá recopilar toda la información
-            necesaria para configurar correctamente tu CRM, automatizaciones,
-            inteligencia artificial y los sistemas de tu empresa.
-          </p>
-          <p className="mt-3 leading-relaxed text-muted">
-            La información que compartas nos ayudará a implementar tu proyecto
-            de forma más rápida, organizada y precisa.
-          </p>
+              <p className="mt-4 leading-relaxed text-muted">
+                Este formulario nos permitirá recopilar toda la información
+                necesaria para configurar correctamente tu CRM, automatizaciones,
+                inteligencia artificial y los sistemas de tu empresa.
+              </p>
+              <p className="mt-3 leading-relaxed text-muted">
+                La información que compartas nos ayudará a implementar tu proyecto
+                de forma más rápida, organizada y precisa.
+              </p>
+            </>
+          )}
 
           <div className="mt-7 space-y-2.5 rounded-xl border border-border bg-surface p-4">
-            <Dato icono="⏱️" texto="Tiempo estimado: 30 minutos." />
+            <Dato
+              icono="⏱️"
+              texto={
+                version === VERSION_MENTOR
+                  ? "Tiempo estimado: 5 minutos."
+                  : version === VERSION_CLIENTE
+                    ? "Tiempo estimado: 15 minutos."
+                    : "Tiempo estimado: 30 minutos."
+              }
+            />
             <Dato icono="📱" texto="Puedes completarlo desde cualquier dispositivo." />
             <Dato
               icono="💾"

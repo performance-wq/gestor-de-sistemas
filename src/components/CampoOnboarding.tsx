@@ -91,20 +91,52 @@ export function CampoOnboarding({
           : pregunta.tipo === "tel"
             ? "tel"
             : "text";
+    const listaId = pregunta.sugerencias?.length ? `sug-${pregunta.id}` : undefined;
     return (
-      <input
-        autoFocus
-        type={tipoHtml}
-        inputMode={pregunta.tipo === "tel" ? "tel" : undefined}
-        value={(valor as string) ?? ""}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={enterHandler}
-        placeholder={
-          pregunta.placeholder ??
-          (pregunta.tipo === "url" ? "https://…" : "Escribe tu respuesta…")
-        }
-        className={inputCls}
-      />
+      <>
+        <input
+          autoFocus
+          type={tipoHtml}
+          inputMode={pregunta.tipo === "tel" ? "tel" : undefined}
+          list={listaId}
+          value={(valor as string) ?? ""}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={enterHandler}
+          placeholder={
+            pregunta.placeholder ??
+            (pregunta.tipo === "url" ? "https://…" : "Escribe tu respuesta…")
+          }
+          className={inputCls}
+        />
+        {listaId && (
+          <>
+            <datalist id={listaId}>
+              {pregunta.sugerencias!.map((s) => (
+                <option key={s} value={s} />
+              ))}
+            </datalist>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {pregunta.sugerencias!.map((s) => {
+                const activo = (valor as string) === s;
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => onChange(s)}
+                    className={`rounded-full border px-4 py-1.5 text-sm transition-colors ${
+                      activo
+                        ? "border-accent bg-accent text-white"
+                        : "border-border bg-surface hover:border-accent"
+                    }`}
+                  >
+                    {s}
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </>
     );
   }
 

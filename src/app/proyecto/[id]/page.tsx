@@ -305,14 +305,33 @@ export default function ProyectoView() {
               proyectoId={proyecto.id}
               proyectoNombre={proyecto.nombre}
               cliente={proyecto.cliente}
-              version={1}
+              version={3}
             />
             <OnboardingPanel
               proyectoId={proyecto.id}
               proyectoNombre={proyecto.nombre}
               cliente={proyecto.cliente}
-              version={2}
+              version={4}
             />
+            <details className="rounded-2xl border border-dashed border-border p-4">
+              <summary className="cursor-pointer text-sm font-medium text-muted">
+                Versiones anteriores del formulario (V1 y V2)
+              </summary>
+              <div className="mt-4 space-y-6">
+                <OnboardingPanel
+                  proyectoId={proyecto.id}
+                  proyectoNombre={proyecto.nombre}
+                  cliente={proyecto.cliente}
+                  version={1}
+                />
+                <OnboardingPanel
+                  proyectoId={proyecto.id}
+                  proyectoNombre={proyecto.nombre}
+                  cliente={proyecto.cliente}
+                  version={2}
+                />
+              </div>
+            </details>
           </div>
         )}
 

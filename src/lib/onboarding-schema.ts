@@ -32,6 +32,8 @@ export interface Pregunta {
   /** Tamaño máximo por archivo en MB (si no, se usa MAX_MB global). */
   maxMb?: number;
   placeholder?: string;
+  /** Sugerencias para un campo de texto (se puede escribir otra cosa). */
+  sugerencias?: string[];
 }
 
 export interface SeccionOnboarding {
@@ -249,8 +251,112 @@ export const SECCIONES_V2: SeccionOnboarding[] = [
   },
 ];
 
-/** Secciones del formulario según la versión (1 = original, 2 = ágil). */
+// =============================================================
+// Onboarding V3 (nov 2026): el formulario se divide en DOS enlaces.
+//  - V3 · Cliente (version 3): lo llena el empresario.
+//  - V3 · Mentor  (version 4): lo llena su mentor de La Sociedad del
+//    Dinero; solo el Prompt Maestro.
+// «Información Adicional» se eliminó a pedido de Boyer (generaba ruido).
+// IDs con prefijo v3_ / v3m_ para no colisionar con V1/V2.
+// =============================================================
+export const VERSION_CLIENTE = 3;
+export const VERSION_MENTOR = 4;
+
+/** Mentores sugeridos (el cliente puede escribir otro nombre). */
+export const MENTORES_SUGERIDOS = ["Porto", "Jaima"];
+
+export const SECCIONES_V3: SeccionOnboarding[] = [
+  {
+    id: "v3_personal",
+    titulo: "Información Personal",
+    descripcion: "Para saber con quién estamos trabajando.",
+    preguntas: [
+      { id: "v3_nombre", titulo: "¿Cuál es tu nombre completo?", tipo: "texto", placeholder: "Ej. María González Pérez" },
+      { id: "v3_email", titulo: "¿Cuál es tu correo electrónico?", tipo: "email", placeholder: "tucorreo@empresa.com" },
+      { id: "v3_whatsapp", titulo: "¿Cuál es tu teléfono / WhatsApp?", tipo: "tel", ayuda: "Incluye el código de país.", placeholder: "+52 55 1234 5678" },
+      {
+        id: "v3_mentor",
+        titulo: "¿Quién es tu mentor?",
+        tipo: "texto",
+        ayuda: "Tu mentor de La Sociedad del Dinero. Elige uno de la lista o escribe su nombre.",
+        placeholder: "Ej. Porto",
+        sugerencias: MENTORES_SUGERIDOS,
+      },
+    ],
+  },
+  {
+    id: "v3_negocio",
+    titulo: "Información del Negocio",
+    descripcion: "Los datos básicos de tu negocio.",
+    preguntas: [
+      { id: "v3_neg_nombre", titulo: "¿Cuál es el nombre de tu negocio?", tipo: "texto", placeholder: "Ej. Clínica Sonrisa" },
+      { id: "v3_neg_direccion", titulo: "¿Cuál es la dirección física?", tipo: "texto" },
+      { id: "v3_neg_maps", titulo: "Link de Google Maps", tipo: "url", opcional: true, placeholder: "https://maps.google.com/…" },
+      { id: "v3_neg_horario", titulo: "¿Cuál es tu horario de atención?", tipo: "textarea" },
+      { id: "v3_neg_telefono", titulo: "Teléfono de contacto", tipo: "tel" },
+      { id: "v3_neg_whatsapp", titulo: "WhatsApp", tipo: "tel" },
+    ],
+  },
+  {
+    id: "v3_comercial",
+    titulo: "Configuración Comercial",
+    descripcion: "Información estratégica para configurar la atención comercial.",
+    preguntas: [
+      {
+        id: "v3_obj_ia",
+        titulo: "¿Cuál es el objetivo principal de la IA durante la atención de prospectos?",
+        tipo: "textarea",
+        ayuda: "Por ejemplo: brindar información, agendar citas, derivar con un asesor o calificar prospectos. Puedes elegir uno, combinar varios o describirlo con tus palabras.",
+      },
+      {
+        id: "v3_post_compra",
+        titulo: "¿Qué sucede después de que un cliente compra o realiza una reserva?",
+        tipo: "textarea",
+        ayuda: "Nos ayudará a configurar los flujos de seguimiento y automatización.",
+      },
+    ],
+  },
+  {
+    id: "v3_contenido",
+    titulo: "Contenido Comercial",
+    descripcion:
+      "Comparte el mejor contenido disponible de tu negocio. Puedes incluir testimonios, casos de éxito, antes y después, recorrido por el negocio, productos, servicios, instalaciones, cómo llegar o cualquier material que represente bien tu operación.",
+    preguntas: [
+      { id: "v3_imagenes", titulo: "Sube hasta 5 imágenes de tu negocio", tipo: "imagenes", maximo: 5, ayuda: "El mejor material disponible: testimonios, productos, instalaciones, antes y después, etc." },
+      { id: "v3_videos", titulo: "Sube hasta 5 videos de tu negocio", tipo: "videos", maximo: 5, maxMb: 500, opcional: true, ayuda: "Testimonios, casos de éxito, recorrido por el negocio, etc." },
+      { id: "v3_logo", titulo: "Sube el logo de tu negocio", tipo: "imagenes", cantidad: 1 },
+    ],
+  },
+];
+
+export const SECCIONES_MENTOR: SeccionOnboarding[] = [
+  {
+    id: "v3m_prompt",
+    titulo: "Prompt Maestro",
+    descripcion: "La información que la IA necesita para atender como el negocio.",
+    preguntas: [
+      {
+        id: "v3m_prompt_maestro",
+        titulo: "Pega aquí el Prompt Maestro del negocio",
+        tipo: "textarea",
+        ayuda: "Puedes pegar un prompt muy extenso. No hay límite de longitud.",
+      },
+    ],
+  },
+];
+
+/** Nombre corto de cada versión, para etiquetas en la app. */
+export function etiquetaVersion(version?: number): string {
+  if (version === VERSION_MENTOR) return "V3 · Mentor";
+  if (version === VERSION_CLIENTE) return "V3 · Cliente";
+  if (version === 2) return "V2 · Ágil";
+  return "V1";
+}
+
+/** Secciones del formulario según la versión (1 original, 2 ágil, 3 cliente, 4 mentor). */
 export function seccionesDe(version?: number): SeccionOnboarding[] {
+  if (version === VERSION_MENTOR) return SECCIONES_MENTOR;
+  if (version === VERSION_CLIENTE) return SECCIONES_V3;
   return version === 2 ? SECCIONES_V2 : SECCIONES;
 }
 
