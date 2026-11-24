@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { formatFechaHora } from "@/lib/ui";
 import { ProgressBar } from "./ProgressBar";
+import { useStore } from "@/lib/store";
 import {
   CONTROL_CALIDAD,
   PUNTOS_REQUERIDOS,
@@ -36,6 +37,16 @@ export function ControlCalidad({ proyectoId }: { proyectoId: string }) {
   const [filas, setFilas] = useState<Record<string, Fila>>({});
   const [cargado, setCargado] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { usuario } = useStore();
+  const esPropietario = usuario?.rol === "admin";
+  const [abiertos, setAbiertos] = useState<Record<string, boolean>>({});
+  const [pendiente, setPendiente] = useState<{
+    key: string;
+    codigo: string;
+    texto: string;
+    rol: RolCalidad;
+    revertir: boolean;
+  } | null>(null);
 
   useEffect(() => {
     let vivo = true;
@@ -67,7 +78,7 @@ export function ControlCalidad({ proyectoId }: { proyectoId: string }) {
       item_key: key,
       rol,
       ok: cambios.ok ?? previa?.ok ?? false,
-      nota: cambios.nota !== undefined ? cambios.nota : previa?.nota ?? null,
+      nota: cambios.nota !== undefined ? cambios.nota : (previa?.nota ?? null),
       marcado_por_nombre: previa?.marcado_por_nombre ?? null,
       marcado_en: previa?.marcado_en ?? null,
     };
@@ -94,7 +105,11 @@ export function ControlCalidad({ proyectoId }: { proyectoId: string }) {
         else delete n[id];
         return n;
       });
-      setError("No se pudo guardar. Revisa tu conexión e inténtalo de nuevo.");
+      setError(
+        error.message.includes("propietario")
+          ? "Solo el propietario puede revertir una verificación."
+          : "No se pudo guardar. Revisa tu conexión e inténtalo de nuevo.",
+      );
       return;
     }
     if (data) setFilas((p) => ({ ...p, [id]: data as Fila }));
@@ -149,8 +164,8 @@ export function ControlCalidad({ proyectoId }: { proyectoId: string }) {
               Control de calidad
             </h2>
             <p className="text-sm text-muted">
-              Primero lo pasa la implementadora y luego la supervisora,
-              sistema por sistema.
+              Primero lo pasa la implementadora y luego la supervisora, sistema
+              por sistema.
             </p>
           </div>
         </div>
@@ -177,56 +192,188 @@ export function ControlCalidad({ proyectoId }: { proyectoId: string }) {
       </section>
 
       {/* Sistemas */}
-      {CONTROL_CALIDAD.map((s) => {
+      {CONTROL_CALIDAD.map((s, si) => {
+        const abierto = !!abiertos[s.id];
         const req = s.puntos.filter((p) => !p.opcional);
-        const okImp = req.filter((p) => filas[k(p.key, "implementadora")]?.ok).length;
-        const okSup = req.filter((p) => filas[k(p.key, "supervisora")]?.ok).length;
+        const okImp = req.filter(
+          (p) => filas[k(p.key, "implementadora")]?.ok,
+        ).length;
+        const okSup = req.filter(
+          (p) => filas[k(p.key, "supervisora")]?.ok,
+        ).length;
         return (
           <section
             key={s.id}
             className="overflow-hidden rounded-2xl border border-border bg-surface shadow-sm"
           >
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-3">
-              <h3 className="font-semibold">{s.nombre}</h3>
+            <button
+              onClick={() => setAbiertos((p) => ({ ...p, [s.id]: !p[s.id] }))}
+              className="flex w-full flex-wrap items-center justify-between gap-2 px-5 py-3 text-left transition-colors hover:bg-slate-50"
+            >
+              <h3 className="flex items-center gap-2 font-semibold">
+                <span
+                  className={`text-xs text-muted transition-transform ${abierto ? "rotate-90" : ""}`}
+                >
+                  ▶
+                </span>
+                {s.nombre}
+                {okSup === req.length && (
+                  <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700">
+                    Aprobado
+                  </span>
+                )}
+              </h3>
               <span className="text-xs text-muted">
                 Implementadora {okImp}/{req.length} · Supervisora {okSup}/
                 {req.length}
               </span>
-            </div>
+            </button>
 
-            <div className="hidden grid-cols-[1fr_7.5rem_7.5rem] gap-2 border-b border-border bg-background/60 px-5 py-2 text-xs font-medium text-muted sm:grid">
-              <span>Punto a revisar</span>
-              {ROLES.map((r) => (
-                <span key={r.id} className="text-center">
-                  {r.label}
-                </span>
-              ))}
-            </div>
+            {abierto && (
+              <div className="border-t border-border">
+                <div className="hidden grid-cols-[1fr_7.5rem_7.5rem] gap-2 border-b border-border bg-background/60 px-5 py-2 text-xs font-medium text-muted sm:grid">
+                  <span>Punto a revisar</span>
+                  {ROLES.map((r) => (
+                    <span key={r.id} className="text-center">
+                      {r.label}
+                    </span>
+                  ))}
+                </div>
 
-            <ul className="divide-y divide-border">
-              {s.puntos.map((p) => (
-                <FilaPunto
-                  key={p.key}
-                  punto={p}
-                  filas={filas}
-                  onToggle={(rol) =>
-                    guardar(p.key, rol, { ok: !filas[k(p.key, rol)]?.ok })
+                <ul className="divide-y divide-border">
+                  {s.puntos.map((p, pi) => {
+                    const codigo = `${si + 1}.${pi + 1}`;
+                    return (
+                      <FilaPunto
+                        key={p.key}
+                        codigo={codigo}
+                        punto={p}
+                        filas={filas}
+                        esPropietario={esPropietario}
+                        onToggle={(rol) =>
+                          setPendiente({
+                            key: p.key,
+                            codigo,
+                            texto: p.texto,
+                            rol,
+                            revertir: !!filas[k(p.key, rol)]?.ok,
+                          })
+                        }
+                      />
+                    );
+                  })}
+                </ul>
+
+                <Observacion
+                  key={
+                    filas[k(obsKey(s.id), "supervisora")]?.marcado_en ?? "nuevo"
+                  }
+                  valor={filas[k(obsKey(s.id), "supervisora")]?.nota ?? ""}
+                  autor={filas[k(obsKey(s.id), "supervisora")]}
+                  onGuardar={(nota) =>
+                    guardar(obsKey(s.id), "supervisora", { nota: nota || null })
                   }
                 />
-              ))}
-            </ul>
-
-            <Observacion
-              key={filas[k(obsKey(s.id), "supervisora")]?.marcado_en ?? "nuevo"}
-              valor={filas[k(obsKey(s.id), "supervisora")]?.nota ?? ""}
-              autor={filas[k(obsKey(s.id), "supervisora")]}
-              onGuardar={(nota) =>
-                guardar(obsKey(s.id), "supervisora", { nota: nota || null })
-              }
-            />
+              </div>
+            )}
           </section>
         );
       })}
+
+      {pendiente && (
+        <ModalVerificar
+          {...pendiente}
+          onCancelar={() => setPendiente(null)}
+          onConfirmar={() => {
+            guardar(pendiente.key, pendiente.rol, {
+              ok: !pendiente.revertir,
+            });
+            setPendiente(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function ModalVerificar({
+  codigo,
+  texto,
+  rol,
+  revertir,
+  onCancelar,
+  onConfirmar,
+}: {
+  codigo: string;
+  texto: string;
+  rol: RolCalidad;
+  revertir: boolean;
+  onCancelar: () => void;
+  onConfirmar: () => void;
+}) {
+  const [valor, setValor] = useState("");
+  const coincide = valor.trim() === codigo;
+  const quien = rol === "implementadora" ? "implementadora" : "supervisora";
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+      onClick={onCancelar}
+    >
+      <div
+        className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="text-lg font-semibold">
+          {revertir ? "Revertir verificación" : "Verificar punto"} {codigo}
+        </h2>
+        <p className="mt-1 text-sm text-muted">
+          {texto} · <span className="font-medium">{quien}</span>
+        </p>
+        <p
+          className={`mt-3 rounded-lg border px-3 py-2 text-sm ${
+            revertir
+              ? "border-red-200 bg-red-50 text-red-700"
+              : "border-amber-200 bg-amber-50 text-amber-800"
+          }`}
+        >
+          {revertir
+            ? "Como propietario puedes desmarcar esta verificación."
+            : "Una vez verificado ya no se puede revertir. Solo el propietario puede desmarcarlo."}
+        </p>
+        <label className="mt-4 block text-sm font-medium">
+          Para confirmar, escribe el código{" "}
+          <span className="font-bold tabular-nums">{codigo}</span>
+        </label>
+        <input
+          autoFocus
+          inputMode="decimal"
+          value={valor}
+          onChange={(e) => setValor(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && coincide) onConfirmar();
+          }}
+          placeholder={codigo}
+          autoComplete="off"
+          className="mt-1.5 w-full rounded-lg border border-border bg-white px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+        />
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            onClick={onCancelar}
+            className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted hover:bg-slate-50"
+          >
+            Cancelar
+          </button>
+          <button
+            disabled={!coincide}
+            onClick={onConfirmar}
+            className={`rounded-lg px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 ${
+              revertir ? "bg-red-600" : "bg-emerald-600"
+            }`}
+          >
+            {revertir ? "Revertir" : "Verificar"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -247,7 +394,8 @@ function Barra({
       <div className="mb-1 flex items-center justify-between text-sm">
         <span className="font-medium">{label}</span>
         <span className="text-muted">
-          {hechos}/{total} · <span className="font-semibold text-foreground">{pct}%</span>
+          {hechos}/{total} ·{" "}
+          <span className="font-semibold text-foreground">{pct}%</span>
         </span>
       </div>
       <ProgressBar pct={pct} />
@@ -256,62 +404,91 @@ function Barra({
 }
 
 function FilaPunto({
+  codigo,
   punto,
   filas,
+  esPropietario,
   onToggle,
 }: {
+  codigo: string;
   punto: PuntoCalidad;
   filas: Record<string, Fila>;
+  esPropietario: boolean;
   onToggle: (rol: RolCalidad) => void;
 }) {
   return (
     <li className="grid gap-2 px-5 py-3 sm:grid-cols-[1fr_7.5rem_7.5rem] sm:items-center">
-      <div className="min-w-0">
-        <p className="text-sm font-medium">
-          {punto.texto}
-          {punto.opcional && (
-            <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-normal text-muted">
-              opcional
-            </span>
+      <div className="flex min-w-0 gap-2.5">
+        <span className="w-7 shrink-0 pt-px text-right text-xs font-semibold tabular-nums text-muted">
+          {codigo}
+        </span>
+        <div className="min-w-0">
+          <p className="text-sm font-medium">
+            {punto.texto}
+            {punto.opcional && (
+              <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-normal text-muted">
+                opcional
+              </span>
+            )}
+          </p>
+          {punto.detalle && (
+            <p className="mt-0.5 text-xs text-muted">{punto.detalle}</p>
           )}
-        </p>
-        {punto.detalle && (
-          <p className="mt-0.5 text-xs text-muted">{punto.detalle}</p>
-        )}
+        </div>
       </div>
       <div className="flex gap-2 sm:contents">
         {ROLES.map((r) => {
           const f = filas[k(punto.key, r.id)];
           const ok = !!f?.ok;
+          const bloqueado = ok && !esPropietario;
           return (
-            <button
+            <div
               key={r.id}
-              onClick={() => onToggle(r.id)}
-              title={
-                ok && f?.marcado_por_nombre
-                  ? `Revisado por ${f.marcado_por_nombre}${
-                      f.marcado_en ? ` · ${formatFechaHora(f.marcado_en)}` : ""
-                    }`
-                  : `Marcar como revisado (${r.label})`
-              }
-              className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors sm:flex-none ${
-                ok
-                  ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                  : "border-border bg-white text-muted hover:bg-slate-50"
-              }`}
+              className="flex flex-1 flex-col items-stretch sm:flex-none"
             >
-              <span
-                className={`flex h-4 w-4 items-center justify-center rounded border text-[10px] ${
+              <button
+                onClick={() => !bloqueado && onToggle(r.id)}
+                disabled={bloqueado}
+                title={
+                  ok && f?.marcado_por_nombre
+                    ? `Verificado por ${f.marcado_por_nombre}${
+                        f.marcado_en
+                          ? ` · ${formatFechaHora(f.marcado_en)}`
+                          : ""
+                      }${bloqueado ? " · solo el propietario puede revertir" : ""}`
+                    : `Verificar (${r.label})`
+                }
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors sm:flex-none ${
                   ok
-                    ? "border-emerald-500 bg-emerald-500 text-white"
-                    : "border-slate-300 bg-white"
+                    ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                    : "border-border bg-white text-muted hover:bg-slate-50"
                 }`}
               >
-                {ok ? "✓" : ""}
-              </span>
-              <span className="sm:hidden">{r.label}</span>
-              <span className="hidden sm:inline">{ok ? "Revisado" : "Pendiente"}</span>
-            </button>
+                <span
+                  className={`flex h-4 w-4 items-center justify-center rounded border text-[10px] ${
+                    ok
+                      ? "border-emerald-500 bg-emerald-500 text-white"
+                      : "border-slate-300 bg-white"
+                  }`}
+                >
+                  {ok ? "✓" : ""}
+                </span>
+                <span className="sm:hidden">{r.label}</span>
+                <span className="hidden sm:inline">
+                  {ok
+                    ? bloqueado
+                      ? "🔒 Verificado"
+                      : "Verificado"
+                    : "Pendiente"}
+                </span>
+              </button>
+              {ok && f?.marcado_por_nombre && (
+                <span className="mt-0.5 truncate text-center text-[10px] text-muted">
+                  {f.marcado_por_nombre.split(" ")[0]}
+                  {f.marcado_en ? ` · ${formatFechaHora(f.marcado_en)}` : ""}
+                </span>
+              )}
+            </div>
           );
         })}
       </div>
