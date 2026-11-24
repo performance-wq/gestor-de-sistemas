@@ -13,14 +13,16 @@ import { Breadcrumb } from "@/components/Breadcrumb";
 import { ContextoIA } from "@/components/ContextoIA";
 import { OnboardingPanel } from "@/components/OnboardingPanel";
 import { ChecklistGestion } from "@/components/ChecklistGestion";
+import { ControlCalidad } from "@/components/ControlCalidad";
 import { EditarProyectoModal } from "@/components/EditarProyectoModal";
 
-type Fase = "onboarding" | "implementacion" | "contexto";
+type Fase = "onboarding" | "implementacion" | "calidad" | "contexto";
 
 const FASES: { id: Fase; n: number; label: string; hint: string }[] = [
   { id: "onboarding", n: 1, label: "Onboarding", hint: "Información del cliente" },
   { id: "implementacion", n: 2, label: "Implementación", hint: "Sistemas" },
-  { id: "contexto", n: 3, label: "Contexto IA", hint: "Conversaciones por servicio" },
+  { id: "calidad", n: 3, label: "Control de calidad", hint: "Implementadora y supervisora" },
+  { id: "contexto", n: 4, label: "Contexto IA", hint: "Conversaciones por servicio" },
 ];
 
 export default function ProyectoView() {
@@ -399,6 +401,8 @@ export default function ProyectoView() {
             </div>
           </div>
         )}
+
+        {fase === "calidad" && <ControlCalidad proyectoId={proyecto.id} />}
 
         {fase === "contexto" && (
           <ContextoIA
